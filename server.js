@@ -472,4 +472,9 @@ if (require.main === module) {
   });
 }
 
-module.exports = { handler, server };
+// Export mặc định LÀ handler (function) để Vercel dùng trực tiếp file này như một
+// serverless function hợp lệ ("default export must be a function or server").
+// Vẫn gắn kèm .handler/.server cho api/index.js và test dùng theo tên.
+module.exports = handler;
+module.exports.handler = handler;
+module.exports.server = server;
