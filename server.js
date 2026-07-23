@@ -10,7 +10,7 @@
 const http = require('node:http');
 const fs = require('node:fs');
 const path = require('node:path');
-const { HCMC_BBOX, isInHCMC } = require('./geo.js');
+const { HCMC_BBOX, isInHCMC } = require('./public/geo.js');
 const store = require('./db.js');
 const { layTuyen } = require('./osrm.js');
 const {
@@ -450,11 +450,7 @@ async function handler(req, res) {
     if (url.pathname === '/api/interest' && req.method === 'POST') {
       return await handleQuanTam(req, res);
     }
-    // geo.js nằm ngoài public để dùng chung với server -> phục vụ riêng
-    if (url.pathname === '/geo.js') {
-      res.writeHead(200, { 'Content-Type': MIME['.js'] });
-      return res.end(fs.readFileSync(path.join(__dirname, 'geo.js')));
-    }
+    // geo.js nay nam trong public/ -> serveStatic phuc vu binh thuong (giong app.js).
     return serveStatic(req, res, url.pathname);
   } catch (err) {
     console.error('[loi]', err.message);

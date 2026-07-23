@@ -1,7 +1,7 @@
 // match.js — Toàn bộ luật ghép chuyến. Hàm thuần, không đụng DB, không gọi mạng
 // => test được độc lập và chạy tốn 0 đồng dù bao nhiêu người dùng.
 
-const { haversineKm, pointToRouteKm, pointToSegmentKm, chieuLenTuyen } = require('./geo.js');
+const { haversineKm, pointToRouteKm, pointToSegmentKm, chieuLenTuyen } = require('./public/geo.js');
 
 // Các ngưỡng gom về một chỗ để sau này chỉnh không phải đi lùng khắp code
 const RULES = {

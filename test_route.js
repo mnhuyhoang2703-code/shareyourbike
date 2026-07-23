@@ -12,7 +12,7 @@ process.env.SYB_DB = DB_TAM;
 
 const store = require('./db.js');
 const { xetCap, timMatch } = require('./match.js');
-const { haversineKm } = require('./geo.js');
+const { haversineKm } = require('./public/geo.js');
 
 let pass = 0, fail = 0;
 function ok(ten, dieuKien) {

@@ -11,7 +11,7 @@
 //        SYB_DB=thu.db node seed_50.js   -> nạp sang DB khác, không đụng dữ liệu thật
 
 const { client, sanSang, taoChuyen, layTatCa } = require('./db.js');
-const { haversineKm } = require('./geo.js');
+const { haversineKm } = require('./public/geo.js');
 const { xetCap, giaKhuyenNghi } = require('./match.js');
 
 // ---------------------------------------------------------------------------

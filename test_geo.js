@@ -1,7 +1,7 @@
 // test_geo.js — Chạy: node test_geo.js
 // Kiểm chứng phần toán học của việc ghép chuyến bằng các mốc thật ở TPHCM.
 
-const { haversineKm, pointToRouteKm, isInHCMC } = require('./geo.js');
+const { haversineKm, pointToRouteKm, isInHCMC } = require('./public/geo.js');
 
 let pass = 0, fail = 0;
 function check(name, actual, expected, tolerance) {
