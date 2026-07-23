@@ -98,7 +98,10 @@ function sanSang() {
 // Bỏ ký tự dễ nhìn nhầm (0/O, 1/I/L) để đọc mã qua điện thoại không sai
 const BANG_CHU = 'ABCDEFGHJKMNPQRSTUVWXYZ23456789';
 
-function sinhMa(doDai = 8) {
+// Mã mới 6 ký tự (rút gọn theo feedback Hoàng 23/07/2026). Mã cũ 8 ký tự vẫn
+// tra được vì xác thực bằng so khớp chính xác. 31^6 ≈ 887 triệu tổ hợp + phải
+// đúng SĐT → vẫn quá đủ chống dò.
+function sinhMa(doDai = 6) {
   const bytes = crypto.randomBytes(doDai);
   let s = '';
   for (let i = 0; i < doDai; i++) s += BANG_CHU[bytes[i] % BANG_CHU.length];

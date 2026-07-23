@@ -329,6 +329,30 @@ body {
   border-color: var(--accent);
   box-shadow: 0 0 0 3.5px var(--accent-soft);
 }
+/* ---- Bộ chọn giờ (select 24h + phút 4 mốc) ---- */
+/* Nhãn 1 dòng (không xuống hàng) để 2 bộ chọn giờ luôn bắt đầu cùng một mức → thẳng hàng */
+.row-time .field label { white-space: nowrap; }
+.time-picker { display: flex; align-items: center; gap: 8px; }
+.time-colon { font-weight: 700; color: var(--text); }
+.tsel {
+  flex: 1;
+  padding: 12px 14px;
+  font-size: 15.5px;
+  font-family: inherit;
+  font-weight: 600;
+  color: var(--text);
+  border: 1.5px solid var(--border);
+  border-radius: var(--radius-sm);
+  background: #fff;
+  cursor: pointer;
+  transition: border-color 0.15s, box-shadow 0.15s;
+}
+.tsel:focus {
+  outline: none;
+  border-color: var(--accent);
+  box-shadow: 0 0 0 3.5px var(--accent-soft);
+}
+
 .row { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; }
 .row-tight { grid-template-columns: 1fr auto; gap: 8px; align-items: start; }
 .row > *, .row-tight > *, .field input { min-width: 0; }
@@ -497,6 +521,21 @@ body {
 }
 
 /* =================== THẺ KẾT QUẢ MATCH =================== */
+.chao-mung {
+  padding: 16px 18px;
+  background: linear-gradient(135deg, var(--accent-soft), var(--indigo-soft));
+  border-radius: var(--radius);
+  margin-bottom: 12px;
+}
+.chao-title {
+  font-family: 'Baloo 2', sans-serif;
+  font-weight: 700;
+  font-size: 19px;
+  color: var(--accent-hover);
+  margin-bottom: 4px;
+}
+.chao-sub { font-size: 14px; line-height: 1.6; color: var(--text); margin: 0; }
+
 .my-trip {
   padding: 14px 16px;
   background: linear-gradient(135deg, var(--surface), var(--indigo-soft));

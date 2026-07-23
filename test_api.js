@@ -80,7 +80,7 @@ const mau = (o = {}) => ({
 
   console.log('\n--- Tao chuyen ---');
   const taiXe = (await post('/api/trips', mau({ name: 'Tai Xe A', phone: '0901111111' }))).data;
-  ok('Tao chuyen tai xe => co ma', typeof taiXe.code === 'string' && taiXe.code.length === 8);
+  ok('Tao chuyen tai xe => co ma 6 ky tu', typeof taiXe.code === 'string' && taiXe.code.length === 6);
 
   const khach = (await post('/api/trips', mau({
     role: 'rider', name: 'Khach B', phone: '0902222222',
@@ -136,19 +136,19 @@ const mau = (o = {}) => ({
   console.log('\n--- Chong pha hoai ---');
   ok('Ma sai => 404', (await get('/api/trips/KHONGCO1')).status === 404);
 
-  console.log('\n--- Dang nhap xem: khop ma + ten + sdt ---');
-  const xemRaw = (code, name, phone) => {
+  console.log('\n--- Dang nhap xem: khop ma + sdt (bo xac thuc ten 23/07/2026) ---');
+  const xemRaw = (code, phone) => {
     let q = '';
-    if (name != null) q += (q ? '&' : '?') + 'name=' + encodeURIComponent(name);
-    if (phone != null) q += (q ? '&' : '?') + 'phone=' + encodeURIComponent(phone);
+    if (phone != null) q += '?phone=' + encodeURIComponent(phone);
     return fetch(BASE + '/api/trips/' + code + q).then((r) => r.status);
   };
-  ok('Dung ca 3 => 200', (await xemRaw(taiXe.code, 'Tai Xe A', '0901111111')) === 200);
-  ok('Ten thuong + sdt co khoang trang van khop => 200',
-    (await xemRaw(taiXe.code, '  tai xe a ', '090 111 1111')) === 200);
-  ok('Sai ten => 403', (await xemRaw(taiXe.code, 'Nguoi La', '0901111111')) === 403);
-  ok('Sai sdt => 403', (await xemRaw(taiXe.code, 'Tai Xe A', '0900000000')) === 403);
-  ok('Thieu ten + sdt => 403', (await xemRaw(taiXe.code, null, null)) === 403);
+  ok('Ma + sdt dung => 200', (await xemRaw(taiXe.code, '0901111111')) === 200);
+  ok('SDT co khoang trang/dau cham van khop => 200',
+    (await xemRaw(taiXe.code, '090 111 1111')) === 200);
+  ok('Ten khong con anh huong (bo qua) => van 200',
+    (await fetch(BASE + '/api/trips/' + taiXe.code + '?name=Nguoi+La&phone=0901111111').then((r) => r.status)) === 200);
+  ok('Sai sdt => 403', (await xemRaw(taiXe.code, '0900000000')) === 403);
+  ok('Thieu sdt => 403', (await xemRaw(taiXe.code, null)) === 403);
   ok('Quan tam bang ma sai => 404',
     (await post('/api/interest', { code: 'SAIBET12', targetId: m0.id })).status === 404);
   ok('Do id bua (chuyen khong khop) => tu choi',

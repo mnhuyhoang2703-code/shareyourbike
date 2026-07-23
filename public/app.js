@@ -121,6 +121,9 @@ function setPoint(which, place) {
   capNhatQuyenKeo();
 
   redraw();
+  // Đang ĐĂNG chuyến: zoom sát ghim vừa thả để user kiểm tra / kéo chỉnh cho đúng.
+  // Màn xem kết quả (không được chỉnh điểm) thì để redraw() fit cả tuyến.
+  if (choPhepChinhDiem) map.setView([place.lat, place.lon], 16);
   if (which === 'start' && !points.end) activeField = 'end';
 }
 
@@ -136,11 +139,11 @@ function redraw() {
     const km = Geo.haversineKm(start.lat, start.lon, end.lat, end.lon);
     summaryEl.hidden = false;
     summaryEl.innerHTML = `<strong>${km.toFixed(2)} km</strong>Quãng đường mỗi chiều (đường chim bay).`;
-    map.fitBounds(line.getBounds(), { padding: [50, 50] });
+    // Chỉ fit cả tuyến ở màn xem kết quả. Khi đang đăng, setPoint() lo việc zoom
+    // sát từng ghim vừa thả để user kiểm tra — không tự kéo ra xa nữa.
+    if (!choPhepChinhDiem) map.fitBounds(line.getBounds(), { padding: [50, 50] });
   } else {
     summaryEl.hidden = true;
-    const only = start || end;
-    if (only) map.setView([only.lat, only.lon], 15);
   }
   // Giá gợi ý phụ thuộc quãng đường nên phải tính lại mỗi khi điểm thay đổi.
   // Hàm khai báo phía dưới, lúc redraw() chạy thật thì đã có sẵn.
@@ -361,11 +364,11 @@ function capNhatTheoVaiTro() {
   const nhan = document.getElementById('dropoff-label');
   const goiY = document.getElementById('dropoff-hint');
   if (laTX) {
-    nhan.innerHTML = 'Giờ tới nơi thường ngày <span class="opt">(nên nhập)</span>';
-    goiY.textContent = 'Nhập giờ bạn thường tới nơi để hệ thống ghép được khách đi cùng đường ở giữa tuyến — nhiều kết quả hơn.';
+    nhan.textContent = 'Giờ tới nơi';
+    goiY.textContent = 'Nên nhập — giờ bạn THƯỜNG NGÀY tới nơi, để hệ thống ghép được khách đi cùng đường ở giữa tuyến (nhiều kết quả hơn).';
   } else {
-    nhan.innerHTML = 'Cần tới nơi trước <span class="opt">(tùy chọn)</span>';
-    goiY.textContent = 'Trễ nhất mấy giờ bạn chấp nhận tới nơi — giúp lọc ra tài xế kịp giờ cho bạn.';
+    nhan.textContent = 'Tới nơi trước';
+    goiY.textContent = 'Tuỳ chọn — trễ nhất mấy giờ bạn chấp nhận tới nơi, giúp lọc ra tài xế kịp giờ cho bạn.';
   }
   goiY.hidden = false;
 
@@ -386,6 +389,81 @@ document.querySelectorAll('input[name="want_type"]').forEach((r) =>
 
 capNhatDanhSachXe();
 capNhatTheoVaiTro();
+
+// ================= CHỌN GIỜ (24h · phút 00/15/30/45) =================
+// Giờ đón = 2 select giờ(00-23) + phút. Giờ tới nơi = 1 select các mốc 15'
+// GIỚI HẠN trong khoảng (giờ đón, giờ đón + 2h] để tránh chọn nhầm range quá rộng.
+const PHUT_MOC = ['00', '15', '30', '45'];
+const hai = (n) => String(n).padStart(2, '0');
+const pkH = document.getElementById('pickup-hour');
+const pkM = document.getElementById('pickup-min');
+const dropH = document.getElementById('dropoff-hour');
+const dropM = document.getElementById('dropoff-min');
+const pickupHidden = document.getElementById('pickup');
+const dropoffHidden = document.getElementById('dropoff');
+
+// Đổ giờ 00-23 và phút cho ô giờ đón, đặt mặc định 07:00
+(function dungOChonGioDon() {
+  for (let h = 0; h < 24; h++) pkH.add(new Option(hai(h), hai(h)));
+  for (const m of PHUT_MOC) pkM.add(new Option(m, m));
+  const [h0, m0] = (pickupHidden.value || '07:00').split(':');
+  pkH.value = h0; pkM.value = PHUT_MOC.includes(m0) ? m0 : '00';
+})();
+
+function phutTuChuoi(hhmm) {
+  const [h, m] = hhmm.split(':').map(Number);
+  return h * 60 + m;
+}
+
+// Các mốc 15' hợp lệ cho "giờ tới nơi": đúng trong khoảng (giờ đón, giờ đón + 2h].
+function mocToiNoi() {
+  const base = phutTuChuoi(pickupHidden.value);
+  const ds = [];
+  for (let t = base + 15; t <= base + 120 && t < 24 * 60; t += 15) ds.push(t);
+  return ds;
+}
+
+// Dựng lại ô GIỜ (kèm ô PHÚT theo giờ đang chọn) mỗi khi giờ đón đổi.
+// Ô giờ chỉ liệt kê các giờ nằm trong vòng 2 tiếng kể từ giờ đón.
+function dungOToiNoi() {
+  const cu = dropoffHidden.value;                       // "HH:MM" hoặc ""
+  const gioCo = [...new Set(mocToiNoi().map((t) => hai(Math.floor(t / 60))))];
+
+  dropH.innerHTML = '';
+  dropH.add(new Option('--', ''));                      // "--" = không nhập (tuỳ chọn)
+  for (const h of gioCo) dropH.add(new Option(h, h));
+
+  const chH = cu.split(':')[0];
+  dropH.value = gioCo.includes(chH) ? chH : '';
+  napPhutToiNoi(cu);
+}
+
+// Ô PHÚT chỉ chứa các phút hợp lệ ứng với giờ đang chọn → không chọn ra ngoài khoảng.
+function napPhutToiNoi(cu = '') {
+  dropM.innerHTML = '';
+  const h = dropH.value;
+  if (!h) { dropoffHidden.value = ''; return; }
+  const phut = mocToiNoi()
+    .filter((t) => hai(Math.floor(t / 60)) === h)
+    .map((t) => hai(t % 60));
+  for (const m of phut) dropM.add(new Option(m, m));
+  if (cu.split(':')[0] === h && phut.includes(cu.split(':')[1])) dropM.value = cu.split(':')[1];
+  dongBoToiNoi();
+}
+
+function dongBoToiNoi() {
+  dropoffHidden.value = dropH.value ? `${dropH.value}:${dropM.value}` : '';
+}
+
+function dongBoGioDon() {
+  pickupHidden.value = `${pkH.value}:${pkM.value}`;
+  dungOToiNoi();
+}
+pkH.addEventListener('change', dongBoGioDon);
+pkM.addEventListener('change', dongBoGioDon);
+dropH.addEventListener('change', () => napPhutToiNoi(dropoffHidden.value));
+dropM.addEventListener('change', dongBoToiNoi);
+dungOToiNoi();
 
 const errBox = document.getElementById('form-errors');
 function hienLoi(ds) {
@@ -473,8 +551,7 @@ document.getElementById('btn-copy').addEventListener('click', async (e) => {
 
 document.getElementById('btn-xem-ngay').addEventListener('click', () => {
   document.getElementById('ma-input').value = document.getElementById('ma-cua-toi').textContent;
-  // Người vừa đăng đã nhập tên + sđt ở form -> điền sẵn để qua được cửa xác thực.
-  document.getElementById('ten-xem').value = document.getElementById('name').value.trim();
+  // Người vừa đăng đã nhập sđt ở form -> điền sẵn để qua được cửa xác thực.
   document.getElementById('sdt-xem').value = document.getElementById('phone').value.trim();
   showView('xem');
   traCuu();
@@ -498,11 +575,9 @@ function esc(s) {
 
 async function traCuu() {
   const ma = document.getElementById('ma-input').value.trim().toUpperCase();
-  const ten = document.getElementById('ten-xem').value.trim();
   const sdt = document.getElementById('sdt-xem').value.trim();
   const thieu = [];
   if (!ma) thieu.push('mã đi chung');
-  if (!ten) thieu.push('tên');
   if (!sdt) thieu.push('số điện thoại');
   if (thieu.length) {
     boxKq.innerHTML = '';
@@ -515,7 +590,7 @@ async function traCuu() {
   boxKq.innerHTML = '<div class="empty">Đang tra…</div>';
 
   try {
-    const q = '?name=' + encodeURIComponent(ten) + '&phone=' + encodeURIComponent(sdt);
+    const q = '?phone=' + encodeURIComponent(sdt);
     const r = await fetch('/api/trips/' + encodeURIComponent(ma) + q);
     const data = await r.json();
     if (!r.ok) {
@@ -535,8 +610,13 @@ async function traCuu() {
 }
 
 function veChuyenCuaToi(me) {
+  const tenChao = esc((me.name || '').trim().split(/\s+/).slice(-1)[0] || 'bạn');
   boxToi.innerHTML =
-    `<div class="my-trip">
+    `<div class="chao-mung">
+      <div class="chao-title">Xin chào ${tenChao} 👋</div>
+      <p class="chao-sub">Đây là hành trình bạn đã đăng cùng những người có thể đi chung đường với bạn. Chúc bạn sớm tìm được bạn đồng hành nhé! 🛵</p>
+    </div>
+    <div class="my-trip">
       <div class="t">Chuyến của bạn — ${me.role === 'driver'
         ? 'Có xe' + (me.tenLoaiXe ? ` (${esc(me.tenLoaiXe)}${me.vehicle_model ? ' · ' + esc(me.vehicle_model) : ''})` : '')
         : 'Cần đi nhờ'}</div>

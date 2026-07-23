@@ -177,14 +177,24 @@
 
           <div class="block">
             <span class="block-title">Thời gian</span>
-            <div class="row">
+            <div class="row row-time">
               <div class="field">
-                <label for="pickup">Giờ đón</label>
-                <input id="pickup" type="time" value="07:00" required>
+                <label for="pickup-hour">Giờ đón</label>
+                <div class="time-picker">
+                  <select id="pickup-hour" class="tsel" aria-label="Giờ đón - giờ"></select>
+                  <span class="time-colon">:</span>
+                  <select id="pickup-min" class="tsel" aria-label="Giờ đón - phút"></select>
+                </div>
+                <input id="pickup" type="hidden" value="07:00">
               </div>
               <div class="field">
-                <label for="dropoff" id="dropoff-label">Giờ tới nơi <span class="opt">(tùy chọn)</span></label>
-                <input id="dropoff" type="time">
+                <label for="dropoff-hour" id="dropoff-label">Giờ tới nơi</label>
+                <div class="time-picker">
+                  <select id="dropoff-hour" class="tsel" aria-label="Giờ tới nơi - giờ"></select>
+                  <span class="time-colon">:</span>
+                  <select id="dropoff-min" class="tsel" aria-label="Giờ tới nơi - phút"></select>
+                </div>
+                <input id="dropoff" type="hidden">
               </div>
             </div>
             <p class="micro" id="dropoff-hint"></p>
@@ -236,7 +246,7 @@
       <section id="view-xong" class="view" hidden>
         <div class="done">
           <div class="done-title">Đã đăng tuyến 🎉</div>
-          <p class="micro">Đây là <strong>mã đi chung</strong> của bạn. Lần sau quay lại xem kết quả, hãy nhập <strong>mã này + đúng tên + số điện thoại</strong> vừa dùng. Nhớ lưu lại nhé!</p>
+          <p class="micro">Đây là <strong>mã đi chung</strong> của bạn. Lần sau quay lại xem kết quả, hãy nhập <strong>mã này + số điện thoại</strong> vừa dùng. Nhớ lưu lại nhé!</p>
           <div class="code-box"><span id="ma-cua-toi"></span></div>
           <button class="btn btn-ghost" id="btn-copy">Sao chép mã</button>
           <button class="btn btn-primary" id="btn-xem-ngay">Xem kết quả match</button>
@@ -248,15 +258,11 @@
       <section id="view-xem" class="view" hidden>
         <div class="block">
           <span class="block-title">Đăng nhập xem kết quả</span>
-          <p class="micro">Nhập đúng <strong>mã đi chung + tên + số điện thoại</strong> bạn đã dùng khi đăng tuyến.</p>
-          <div class="field">
-            <label for="ma-input">Mã đi chung</label>
-            <input id="ma-input" type="text" placeholder="VD: K7M2PQR4" maxlength="8" autocomplete="off">
-          </div>
+          <p class="micro">Nhập đúng <strong>mã đi chung + số điện thoại</strong> bạn đã dùng khi đăng tuyến.</p>
           <div class="row">
             <div class="field">
-              <label for="ten-xem">Tên của bạn</label>
-              <input id="ten-xem" type="text" placeholder="Nguyễn Văn A" autocomplete="off">
+              <label for="ma-input">Mã đi chung</label>
+              <input id="ma-input" type="text" placeholder="VD: K7M2PQ" maxlength="8" autocomplete="off">
             </div>
             <div class="field">
               <label for="sdt-xem">Số điện thoại</label>
