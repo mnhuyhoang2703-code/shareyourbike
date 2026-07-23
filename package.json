@@ -1,0 +1,16 @@
+{
+  "name": "shareyourbike",
+  "version": "1.0.0",
+  "description": "Web ghép chuyến đi chung xe ở TPHCM (Dichungxe.com)",
+  "private": true,
+  "scripts": {
+    "start": "node server.js",
+    "test": "node test_geo.js && node test_match.js && node test_api.js"
+  },
+  "engines": {
+    "node": ">=20"
+  },
+  "dependencies": {
+    "@libsql/client": "^0.15.0"
+  }
+}

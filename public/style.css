@@ -1,0 +1,511 @@
+:root {
+  /* Tone pastel hồng + xanh, phong cách Gen Z nhẹ nhàng */
+  --bg: #fffafc;
+  --surface: #fdeef5;        /* hồng phấn rất nhạt */
+  --surface-blue: #eaf6fb;   /* xanh phấn rất nhạt */
+  --border: #f0cfdd;
+  --border-blue: #c7e6f2;
+  --text: #2e2129;           /* nâu tím đậm — tương phản cao, dễ đọc */
+  --muted: #6b5562;          /* xám tím ĐẬM hơn để chữ phụ vẫn rõ */
+  --accent: #f7729f;         /* hồng pastel chủ đạo */
+  --accent-hover: #d63f77;   /* hồng đậm — dùng cho chữ trên nền trắng */
+  --accent-soft: #ffe3ee;
+  --blue: #6ec6e6;           /* xanh pastel phụ */
+  --blue-soft: #dbf1f9;
+  --start: #63c9a7;          /* mint */
+  --end: #ff9a8b;            /* coral */
+  --ok: #3fb98f;
+  --radius: 16px;
+  --radius-sm: 12px;
+}
+
+* { box-sizing: border-box; }
+
+body {
+  margin: 0;
+  font-family: "Quicksand", -apple-system, "Segoe UI", Roboto, sans-serif;
+  color: var(--text);
+  background: var(--bg);
+  font-weight: 500;
+}
+
+/* =================== MÀN CHÀO =================== */
+.welcome-overlay {
+  position: fixed;
+  inset: 0;
+  z-index: 5000;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 20px;
+  background: linear-gradient(135deg, #ffe0ee 0%, #fce4f1 40%, #dff2fb 100%);
+  overflow-y: auto;
+  transition: opacity 0.35s ease, visibility 0.35s ease;
+}
+.welcome-overlay.is-gone { opacity: 0; visibility: hidden; pointer-events: none; }
+
+.welcome-card {
+  width: 100%;
+  max-width: 440px;
+  background: #fff;
+  border-radius: 28px;
+  padding: 32px 28px;
+  text-align: center;
+  box-shadow: 0 20px 60px rgba(247, 114, 159, 0.22);
+  animation: pop 0.4s cubic-bezier(0.18, 0.89, 0.32, 1.28);
+}
+@keyframes pop {
+  from { transform: translateY(14px) scale(0.96); opacity: 0; }
+  to   { transform: translateY(0) scale(1); opacity: 1; }
+}
+.welcome-emoji { font-size: 46px; line-height: 1; }
+.welcome-title {
+  font-family: "Baloo 2", cursive;
+  font-size: 30px;
+  font-weight: 700;
+  margin: 10px 0 2px;
+  background: linear-gradient(90deg, var(--accent), var(--blue));
+  -webkit-background-clip: text;
+  background-clip: text;
+  -webkit-text-fill-color: transparent;
+}
+.welcome-sub { margin: 0 0 20px; font-size: 15px; color: var(--muted); font-weight: 600; }
+.welcome-body { text-align: left; font-size: 14.5px; line-height: 1.65; }
+.welcome-body > p { margin: 0 0 14px; }
+.welcome-note {
+  display: flex;
+  gap: 10px;
+  padding: 14px 16px;
+  background: var(--surface-blue);
+  border: 1.5px solid var(--border-blue);
+  border-radius: var(--radius);
+}
+.welcome-note-icon { font-size: 20px; line-height: 1.4; flex: none; }
+.welcome-note p { margin: 0; font-size: 13.5px; line-height: 1.6; }
+.welcome-agree {
+  display: flex;
+  align-items: flex-start;
+  gap: 10px;
+  margin: 20px 0 18px;
+  padding: 12px 14px;
+  background: var(--accent-soft);
+  border-radius: var(--radius);
+  text-align: left;
+  font-size: 14px;
+  cursor: pointer;
+  user-select: none;
+}
+.welcome-agree input {
+  width: 20px; height: 20px;
+  margin-top: 1px;
+  flex: none;
+  accent-color: var(--accent);
+  cursor: pointer;
+}
+.welcome-choose {
+  margin: 4px 0 10px;
+  font-size: 14.5px;
+  font-weight: 700;
+  color: var(--text);
+  text-align: center;
+}
+.welcome-actions { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; }
+.welcome-btn { font-size: 15px; padding: 14px 12px; margin-top: 0; }
+.welcome-btn + .welcome-btn { margin-top: 0; }
+
+/* =================== THANH TRÊN =================== */
+.topbar {
+  display: flex;
+  align-items: center;
+  justify-content: flex-start;
+  gap: 22px;
+  padding: 12px 22px;
+  background: #fff;
+  border-bottom: 1.5px solid var(--border);
+}
+.brand {
+  font-family: "Baloo 2", cursive;
+  font-weight: 700;
+  font-size: 20px;
+  background: linear-gradient(90deg, var(--accent), var(--blue));
+  -webkit-background-clip: text;
+  background-clip: text;
+  -webkit-text-fill-color: transparent;
+}
+.tabs { display: flex; gap: 6px; }
+.tab {
+  padding: 8px 16px;
+  font: inherit;
+  font-size: 14px;
+  font-weight: 600;
+  color: var(--muted);
+  background: none;
+  border: none;
+  border-radius: 999px;
+  cursor: pointer;
+  transition: background 0.15s, color 0.15s;
+}
+.tab:hover { background: var(--surface); }
+.tab.is-active { background: var(--accent-soft); color: var(--accent-hover); }
+
+/* =================== BỐ CỤC =================== */
+.layout {
+  display: grid;
+  grid-template-columns: 480px 1fr;
+  height: calc(100vh - 55px);
+}
+.panel { padding: 24px 26px; overflow-y: auto; background: var(--bg); }
+.map { height: 100%; width: 100%; }
+
+/* =================== NHÓM NỘI DUNG =================== */
+.block {
+  margin-bottom: 20px;
+  padding: 16px 16px 18px;
+  background: #fff;
+  border: 1.5px solid var(--border);
+  border-radius: var(--radius);
+}
+.block-title {
+  display: block;
+  font-size: 13px;
+  font-weight: 700;
+  letter-spacing: 0.03em;
+  text-transform: uppercase;
+  color: var(--accent-hover);
+  margin-bottom: 12px;
+}
+.micro { margin: 7px 0 0; font-size: 13.5px; line-height: 1.6; color: var(--muted); font-weight: 500; }
+.opt { font-weight: 500; color: var(--muted); }
+
+/* =================== CHỌN VAI TRÒ =================== */
+.roles { display: grid; grid-template-columns: 1fr 1fr; gap: 8px; }
+
+/* Radio/checkbox thật bị ẩn (giữ trạng thái), phần nhìn thấy là <span>.
+   PHẢI ép width/height 1px, selector 2 cấp để thắng `.field input{width:100%}`. */
+.roles .role input, .days .day input {
+  position: absolute;
+  opacity: 0;
+  pointer-events: none;
+  width: 1px;
+  height: 1px;
+}
+.role-box {
+  display: block;
+  padding: 11px 13px;
+  border: 1.5px solid var(--border);
+  border-radius: var(--radius-sm);
+  cursor: pointer;
+  height: 100%;
+  transition: border-color 0.15s, background 0.15s;
+}
+.role-box:hover { border-color: var(--accent); }
+.role input:checked + .role-box {
+  border-color: var(--accent);
+  background: var(--accent-soft);
+  box-shadow: 0 0 0 1.5px var(--accent) inset;
+}
+.roles-xe .role-box { display: grid; place-items: center; padding: 10px 8px; text-align: center; }
+.roles-3 { grid-template-columns: 1fr 1fr 1fr; }
+
+.role-name { display: block; font-size: 15px; font-weight: 700; color: var(--text); }
+.role-desc { display: block; font-size: 12.5px; line-height: 1.45; color: var(--muted); margin-top: 3px; font-weight: 500; }
+
+/* =================== Ô NHẬP =================== */
+.field { position: relative; margin-bottom: 14px; }
+.field:last-child { margin-bottom: 0; }
+.field label {
+  display: flex;
+  align-items: center;
+  gap: 7px;
+  font-size: 15px;
+  font-weight: 700;
+  color: var(--text);
+  margin-bottom: 8px;
+}
+.dot {
+  width: 22px; height: 18px; flex: none;
+  background-repeat: no-repeat; background-position: center; background-size: contain;
+}
+.dot-start { background-image: var(--seal-blue); }
+.dot-end { background-image: var(--seal-pink); }
+
+.field input {
+  width: 100%;
+  padding: 12px 14px;
+  font-size: 15.5px;
+  font-family: inherit;
+  font-weight: 600;
+  color: var(--text);
+  border: 1.5px solid var(--border);
+  border-radius: var(--radius-sm);
+  background: #fff;
+  transition: border-color 0.15s, box-shadow 0.15s;
+}
+.field input::placeholder { color: #b09aa6; font-weight: 500; }
+.field input:focus {
+  outline: none;
+  border-color: var(--accent);
+  box-shadow: 0 0 0 3.5px var(--accent-soft);
+}
+.row { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; }
+.row-tight { grid-template-columns: 1fr auto; gap: 8px; align-items: start; }
+.row > *, .row-tight > *, .field input { min-width: 0; }
+.row-tight input {
+  width: 100%;
+  padding: 11px 13px;
+  font-size: 15px;
+  font-family: ui-monospace, "SF Mono", Menlo, Consolas, monospace;
+  letter-spacing: 0.1em;
+  text-transform: uppercase;
+  border: 1.5px solid var(--border);
+  border-radius: var(--radius-sm);
+}
+
+/* =================== NGÀY TRONG TUẦN =================== */
+.days { display: flex; gap: 6px; }
+.day span {
+  display: grid;
+  place-items: center;
+  width: 40px;
+  height: 38px;
+  font-size: 12.5px;
+  font-weight: 700;
+  color: var(--muted);
+  border: 1.5px solid var(--border);
+  border-radius: 12px;
+  cursor: pointer;
+  transition: all 0.15s;
+}
+.day span:hover { border-color: var(--accent); }
+.day input:checked + span {
+  background: linear-gradient(135deg, var(--accent), #ff9ec2);
+  border-color: transparent;
+  color: #fff;
+}
+
+/* =================== GỢI Ý ĐỊA CHỈ =================== */
+.suggestions {
+  position: absolute;
+  z-index: 1000;
+  left: 0; right: 0;
+  margin: 6px 0 0;
+  padding: 5px;
+  list-style: none;
+  background: #fff;
+  border: 1.5px solid var(--border);
+  border-radius: var(--radius-sm);
+  box-shadow: 0 10px 30px rgba(247, 114, 159, 0.16);
+  max-height: 240px;
+  overflow-y: auto;
+}
+.suggestions li { padding: 9px 11px; font-size: 13px; line-height: 1.35; border-radius: 9px; cursor: pointer; }
+.suggestions li:hover { background: var(--surface); }
+.suggestions .s-name { font-weight: 600; }
+.suggestions .s-full { color: var(--muted); font-size: 12px; margin-top: 2px; }
+
+.coords {
+  margin-top: 6px;
+  font-size: 12px;
+  font-family: ui-monospace, "SF Mono", Menlo, Consolas, monospace;
+  color: var(--muted);
+}
+
+/* =================== HỘP TÓM TẮT =================== */
+.summary {
+  margin-top: 12px;
+  padding: 12px 14px;
+  background: var(--surface-blue);
+  border: 1.5px solid var(--border-blue);
+  border-radius: var(--radius-sm);
+  font-size: 13px;
+  line-height: 1.5;
+}
+.summary strong { font-size: 18px; font-weight: 700; display: block; color: var(--text); }
+
+/* =================== NÚT =================== */
+.btn {
+  display: block;
+  width: 100%;
+  padding: 12px 16px;
+  font: inherit;
+  font-size: 14.5px;
+  font-weight: 700;
+  border-radius: 999px;
+  border: 1.5px solid transparent;
+  cursor: pointer;
+  transition: transform 0.12s, background 0.15s, box-shadow 0.15s;
+}
+.btn:active { transform: scale(0.98); }
+.btn + .btn { margin-top: 9px; }
+.btn-primary {
+  background: linear-gradient(135deg, var(--accent), #ff96c0);
+  color: #fff;
+  box-shadow: 0 8px 20px rgba(247, 114, 159, 0.32);
+}
+.btn-primary:hover { background: linear-gradient(135deg, var(--accent-hover), #ff86b5); }
+.btn-primary:disabled { background: #f3c5d8; box-shadow: none; cursor: default; }
+.btn-ghost { background: #fff; border-color: var(--border); color: var(--accent-hover); }
+.btn-ghost:hover { background: var(--surface); }
+.btn-inline { width: auto; margin-top: 0; white-space: nowrap; }
+.btn-small { width: auto; padding: 7px 14px; font-size: 13px; margin-top: 0; }
+
+/* Dòng gợi ý giá theo quãng đường */
+.goi-y-gia {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
+  margin-top: 8px;
+  padding: 10px 12px;
+  background: var(--surface-blue);
+  border-radius: 12px;
+  font-size: 12.5px;
+  line-height: 1.5;
+  color: var(--muted);
+}
+.goi-y-gia b { color: var(--text); }
+
+.privacy {
+  margin: 0 0 12px;
+  padding: 12px 14px;
+  background: var(--surface-blue);
+  border: 1.5px solid var(--border-blue);
+  border-radius: var(--radius-sm);
+  font-size: 13.5px;
+  line-height: 1.6;
+  color: var(--text);
+  font-weight: 500;
+}
+.privacy strong { color: var(--accent-hover); }
+
+.errors {
+  margin-top: 10px;
+  padding: 11px 13px;
+  background: #fff0f3;
+  border: 1.5px solid #ffcdd9;
+  border-radius: var(--radius-sm);
+  font-size: 13px;
+  line-height: 1.6;
+  color: #d6547a;
+  font-weight: 600;
+}
+.errors ul { margin: 0; padding-left: 18px; }
+
+/* =================== MÀN ĐĂNG XONG =================== */
+.done {
+  text-align: center;
+  padding: 26px 22px;
+  background: #fff;
+  border: 1.5px solid var(--border);
+  border-radius: var(--radius);
+}
+.done-title { font-family: "Baloo 2", cursive; font-size: 22px; font-weight: 700; margin-bottom: 8px; color: var(--accent-hover); }
+.code-box {
+  margin: 18px 0;
+  padding: 18px;
+  background: linear-gradient(135deg, var(--accent-soft), var(--blue-soft));
+  border: 2px dashed var(--accent);
+  border-radius: var(--radius);
+  font-family: ui-monospace, "SF Mono", Menlo, Consolas, monospace;
+  font-size: 27px;
+  font-weight: 700;
+  letter-spacing: 0.15em;
+  color: var(--text);
+}
+
+/* =================== THẺ KẾT QUẢ MATCH =================== */
+.my-trip {
+  padding: 14px 16px;
+  background: linear-gradient(135deg, var(--surface), var(--blue-soft));
+  border-radius: var(--radius);
+  font-size: 13px;
+  line-height: 1.6;
+  margin-bottom: 16px;
+}
+.my-trip { font-size: 14px; }
+.my-trip .t { font-weight: 700; font-size: 15.5px; margin-bottom: 4px; color: var(--accent-hover); }
+
+.count { font-size: 14px; color: var(--text); margin-bottom: 10px; font-weight: 700; }
+
+.card {
+  padding: 14px 16px;
+  background: #fff;
+  border: 1.5px solid var(--border);
+  border-radius: var(--radius);
+  margin-bottom: 10px;
+  cursor: pointer;
+  transition: border-color 0.15s, box-shadow 0.15s, transform 0.12s;
+}
+.card:hover { border-color: var(--accent); box-shadow: 0 6px 18px rgba(247, 114, 159, 0.12); }
+.card.is-matched { border-color: var(--ok); box-shadow: 0 0 0 1.5px var(--ok) inset; }
+.card-top { display: flex; justify-content: space-between; align-items: baseline; gap: 10px; }
+.card-name { font-weight: 700; font-size: 14.5px; }
+.card-price { font-weight: 700; font-size: 14.5px; white-space: nowrap; color: var(--accent-hover); }
+.card-line { font-size: 13.5px; line-height: 1.65; color: var(--muted); margin-top: 6px; font-weight: 500; }
+.card-line b { color: var(--text); font-weight: 700; }
+.badge {
+  display: inline-block;
+  padding: 3px 10px;
+  border-radius: 999px;
+  font-size: 11px;
+  font-weight: 700;
+  margin-top: 8px;
+}
+.badge-wait { background: #fff2dc; color: #c98a2e; }
+.badge-ok { background: #daf5ea; color: var(--ok); }
+.contact {
+  margin-top: 10px;
+  padding: 11px 13px;
+  background: #daf5ea;
+  border-radius: 12px;
+  font-size: 13px;
+  line-height: 1.6;
+}
+.contact a { color: var(--ok); font-weight: 700; text-decoration: none; }
+.card-actions { margin-top: 10px; }
+
+/* =================== MỤC "GẦN KHỚP" =================== */
+.gan-khop-title {
+  margin: 22px 0 8px;
+  padding-top: 16px;
+  border-top: 1.5px solid var(--border);
+  font-size: 12px;
+  font-weight: 700;
+  letter-spacing: 0.03em;
+  text-transform: uppercase;
+  color: var(--muted);
+}
+.card-gan { background: var(--surface); border-style: dashed; }
+.card-gan .card-name, .card-gan .card-price { color: var(--muted); font-weight: 600; }
+.thieu {
+  margin-top: 9px;
+  padding: 8px 11px;
+  background: #fff2dc;
+  border-radius: 12px;
+  font-size: 12.5px;
+  line-height: 1.5;
+  color: #c98a2e;
+}
+
+.empty {
+  padding: 22px 16px;
+  text-align: center;
+  font-size: 13px;
+  line-height: 1.6;
+  color: var(--muted);
+  background: var(--surface);
+  border-radius: var(--radius);
+  font-weight: 600;
+}
+
+/* =================== ĐIỆN THOẠI =================== */
+@media (max-width: 760px) {
+  .layout { grid-template-columns: 1fr; grid-template-rows: 40vh auto; height: auto; }
+  .map { order: -1; }
+  .panel { padding: 16px; }
+  .roles { grid-template-columns: 1fr; }
+  .row { grid-template-columns: 1fr; }
+  .days { flex-wrap: wrap; }
+  .welcome-card { padding: 26px 20px; border-radius: 24px; }
+  .welcome-title { font-size: 26px; }
+}

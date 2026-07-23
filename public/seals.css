@@ -1,0 +1,56 @@
+/* seals.css — hải cẩu dễ thương làm nền (Hoàng thích hải cẩu, 22/07/2026).
+   Hình vẽ SVG data-URI, không cần file ảnh ngoài, không đụng server -> chỉ F5. */
+:root{
+  --seal-blue: url("data:image/svg+xml,%3Csvg%20xmlns='http://www.w3.org/2000/svg'%20viewBox='0%200%20130%20110'%3E%3Cellipse%20cx='65'%20cy='95'%20rx='40'%20ry='8'%20fill='%23000'%20opacity='.05'/%3E%3Cellipse%20cx='34'%20cy='80'%20rx='13'%20ry='7.5'%20fill='%23a6cadd'%20transform='rotate(-22%2034%2080)'/%3E%3Cellipse%20cx='96'%20cy='80'%20rx='13'%20ry='7.5'%20fill='%23a6cadd'%20transform='rotate(22%2096%2080)'/%3E%3Cellipse%20cx='65'%20cy='62'%20rx='40'%20ry='34'%20fill='%23bcdcec'/%3E%3Cellipse%20cx='65'%20cy='72'%20rx='25'%20ry='23'%20fill='%23eaf6fc'/%3E%3Cellipse%20cx='47'%20cy='58'%20rx='4.5'%20ry='2.8'%20fill='%23ffb9d0'%20opacity='.75'/%3E%3Cellipse%20cx='83'%20cy='58'%20rx='4.5'%20ry='2.8'%20fill='%23ffb9d0'%20opacity='.75'/%3E%3Ccircle%20cx='53'%20cy='51'%20r='3.6'%20fill='%2341484d'/%3E%3Ccircle%20cx='77'%20cy='51'%20r='3.6'%20fill='%2341484d'/%3E%3Ccircle%20cx='54.3'%20cy='49.7'%20r='1.2'%20fill='%23fff'/%3E%3Ccircle%20cx='78.3'%20cy='49.7'%20r='1.2'%20fill='%23fff'/%3E%3Cellipse%20cx='65'%20cy='59'%20rx='3.2'%20ry='2.2'%20fill='%237d98a6'/%3E%3Cpath%20d='M58%2063%20Q65%2069%2072%2063'%20stroke='%236f8b99'%20stroke-width='1.8'%20fill='none'%20stroke-linecap='round'/%3E%3Cpath%20d='M44%2056%20H29%20M45%2060%20H30'%20stroke='%23a9c6d6'%20stroke-width='1.4'%20fill='none'%20stroke-linecap='round'/%3E%3Cpath%20d='M86%2056%20H101%20M85%2060%20H100'%20stroke='%23a9c6d6'%20stroke-width='1.4'%20fill='none'%20stroke-linecap='round'/%3E%3C/svg%3E");
+  --seal-pink: url("data:image/svg+xml,%3Csvg%20xmlns='http://www.w3.org/2000/svg'%20viewBox='0%200%20130%20110'%3E%3Cellipse%20cx='65'%20cy='95'%20rx='40'%20ry='8'%20fill='%23000'%20opacity='.05'/%3E%3Cellipse%20cx='34'%20cy='80'%20rx='13'%20ry='7.5'%20fill='%23f0b3ca'%20transform='rotate(-22%2034%2080)'/%3E%3Cellipse%20cx='96'%20cy='80'%20rx='13'%20ry='7.5'%20fill='%23f0b3ca'%20transform='rotate(22%2096%2080)'/%3E%3Cellipse%20cx='65'%20cy='62'%20rx='40'%20ry='34'%20fill='%23f8cdde'/%3E%3Cellipse%20cx='65'%20cy='72'%20rx='25'%20ry='23'%20fill='%23fdeaf2'/%3E%3Cellipse%20cx='47'%20cy='58'%20rx='4.5'%20ry='2.8'%20fill='%23a6cadd'%20opacity='.75'/%3E%3Cellipse%20cx='83'%20cy='58'%20rx='4.5'%20ry='2.8'%20fill='%23a6cadd'%20opacity='.75'/%3E%3Ccircle%20cx='53'%20cy='51'%20r='3.6'%20fill='%2341484d'/%3E%3Ccircle%20cx='77'%20cy='51'%20r='3.6'%20fill='%2341484d'/%3E%3Ccircle%20cx='54.3'%20cy='49.7'%20r='1.2'%20fill='%23fff'/%3E%3Ccircle%20cx='78.3'%20cy='49.7'%20r='1.2'%20fill='%23fff'/%3E%3Cellipse%20cx='65'%20cy='59'%20rx='3.2'%20ry='2.2'%20fill='%23c77e9a'/%3E%3Cpath%20d='M58%2063%20Q65%2069%2072%2063'%20stroke='%23c77e9a'%20stroke-width='1.8'%20fill='none'%20stroke-linecap='round'/%3E%3Cpath%20d='M44%2056%20H29%20M45%2060%20H30'%20stroke='%23e7aec4'%20stroke-width='1.4'%20fill='none'%20stroke-linecap='round'/%3E%3Cpath%20d='M86%2056%20H101%20M85%2060%20H100'%20stroke='%23e7aec4'%20stroke-width='1.4'%20fill='none'%20stroke-linecap='round'/%3E%3C/svg%3E");
+}
+/* Watermark mờ rải rác sau các thẻ. Thẻ nội dung nền trắng đục -> chữ vẫn rõ. */
+body{
+  background-color: var(--bg);
+  background-image: var(--seal-blue), var(--seal-pink);
+  background-repeat: repeat, repeat;
+  background-size: 340px, 340px;
+  background-position: 10px 30px, 180px 200px;
+}
+.panel{ background: transparent; }
+.map{ z-index: 1; }
+/* Mấy bé hải cẩu nổi bật peeking quanh thẻ màn chào */
+.welcome-card{ position: relative; overflow: visible; }
+.welcome-card::before, .welcome-card::after{
+  content:""; position:absolute; background-repeat:no-repeat; background-size:contain;
+  width:86px; height:73px; pointer-events:none;
+  filter: drop-shadow(0 6px 10px rgba(214,63,119,.15));
+}
+.welcome-card::before{ background-image: var(--seal-pink); top:-50px; left:10px; transform: rotate(-12deg); }
+.welcome-card::after{ background-image: var(--seal-blue); bottom:-42px; right:14px; transform: rotate(10deg); }
+@media (max-width:760px){
+  .welcome-card::before{ width:64px; height:54px; top:-38px; left:2px; }
+  .welcome-card::after{ width:64px; height:54px; bottom:-32px; right:4px; }
+}
+
+/* ===== Marker hải cẩu trên bản đồ ===== */
+.leaflet-div-icon.seal-div{ background:transparent; border:none; }
+.seal-marker{ display:flex; flex-direction:column; align-items:center; line-height:1; }
+/* Huy hiệu tròn nền trắng + viền màu + bóng -> nổi bật hẳn trên nền map beige */
+.seal-inner{
+  background:#fff; border-radius:50%;
+  border:3px solid #cfd8dd;
+  box-shadow:0 3px 8px rgba(0,0,0,.45), 0 0 0 1px rgba(0,0,0,.05);
+  display:grid; place-items:center; overflow:hidden;
+  transition: transform .2s;
+}
+.seal-inner.seal-blue{ border-color:#4bb2dd; }
+.seal-inner.seal-pink{ border-color:#f2609b; }
+.seal-inner svg{ width:112%; height:112%; display:block; }
+.seal-marker.faded .seal-inner{ opacity:.9; border-width:2.5px; }
+.seal-inner.pop{ animation: sealPop .9s ease; }
+@keyframes sealPop{ 0%,100%{ transform:scale(1); } 30%{ transform:scale(1.7); } }
+/* Nhãn tên dưới hải cẩu */
+.seal-cap{
+  margin-top:2px; padding:1px 8px; border-radius:999px;
+  background:#fff; color:#2e2129;
+  font:700 11px/1.5 "Quicksand","Segoe UI",sans-serif;
+  border:1.5px solid var(--border); white-space:nowrap;
+  box-shadow:0 1px 3px rgba(0,0,0,.2);
+}
+.seal-cap.mine{ background:var(--accent); color:#fff; border-color:#fff; }

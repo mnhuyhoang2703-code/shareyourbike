@@ -1,0 +1,13 @@
+node_modules/
+*.db
+*.db-journal
+*.db.bak_*
+.env
+.vercel
+
+# Ghi chú nội bộ / rule dự án / dữ liệu mẫu — không đưa lên repo công khai
+memory.md
+00_core_rules.md
+01_playbook_web_dev.md
+02_toi_uu_token.md
+50_chuyen_mau.csv
