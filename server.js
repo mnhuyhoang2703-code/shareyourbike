@@ -10,12 +10,36 @@
 const http = require('node:http');
 const fs = require('node:fs');
 const path = require('node:path');
+const crypto = require('node:crypto');
 const { HCMC_BBOX, isInHCMC } = require('./public/geo.js');
 const store = require('./db.js');
 const { layTuyen } = require('./osrm.js');
 const {
-  timMatch, timGanKhop, gioSangPhut, tachNgay, TEN_NGAY, TEN_LOAI_XE, DON_GIA, RULES,
+  timMatch, timGanKhop, xetCap, xetGanKhop,
+  gioSangPhut, tachNgay, TEN_NGAY, TEN_LOAI_XE, DON_GIA, RULES,
 } = require('./match.js');
+
+// Nạp biến môi trường từ file .env (nếu có) — không cần thư viện ngoài.
+// Chỉ đặt biến CHƯA tồn tại, để env thật của hệ thống/Vercel luôn được ưu tiên.
+// File .env đã nằm trong .gitignore -> mật khẩu KHÔNG bị đẩy lên git.
+(function napEnv() {
+  try {
+    const p = path.join(__dirname, '.env');
+    if (!fs.existsSync(p)) return;
+    for (const dong of fs.readFileSync(p, 'utf8').split(/\r?\n/)) {
+      const s = dong.trim();
+      if (!s || s.startsWith('#')) continue;
+      const i = s.indexOf('=');
+      if (i < 0) continue;
+      const k = s.slice(0, i).trim();
+      let v = s.slice(i + 1).trim();
+      if ((v.startsWith('"') && v.endsWith('"')) || (v.startsWith("'") && v.endsWith("'"))) {
+        v = v.slice(1, -1);
+      }
+      if (process.env[k] === undefined) process.env[k] = v;
+    }
+  } catch { /* .env hỏng thì bỏ qua, dùng env hệ thống */ }
+})();
 
 const PORT = process.env.PORT || 3000;
 const PUBLIC_DIR = path.join(__dirname, 'public');
@@ -275,14 +299,14 @@ const lamTron = (x) => Math.round(x * 1000) / 1000;
 const chuanTen = (s) => String(s || '').trim().replace(/\s+/g, ' ').toLowerCase();
 const chuanSdt = (s) => String(s || '').replace(/\D/g, '');
 
-async function handleXemChuyen(res, code, name, phone) {
+async function handleXemChuyen(res, code, phone) {
   const me = await store.layTheoMa(String(code || '').trim().toUpperCase());
   if (!me) return json(res, 404, { error: 'Không tìm thấy mã này' });
 
-  // Đăng nhập cần khớp cả 3: mã + tên + số điện thoại (chốt với Hoàng 22/07/2026).
-  // Không nói rõ trường nào sai để tránh dò thông tin của người khác.
-  if (chuanTen(name) !== chuanTen(me.name) || chuanSdt(phone) !== chuanSdt(me.phone)) {
-    return json(res, 403, { error: 'Mã, tên hoặc số điện thoại không khớp. Vui lòng kiểm tra lại.' });
+  // Đăng nhập chỉ cần khớp mã + số điện thoại (đơn giản hoá theo feedback Hoàng 23/07/2026,
+  // bỏ trường tên). Không nói rõ trường nào sai để tránh dò thông tin của người khác.
+  if (chuanSdt(phone) !== chuanSdt(me.phone)) {
+    return json(res, 403, { error: 'Mã hoặc số điện thoại không khớp. Vui lòng kiểm tra lại.' });
   }
 
   // Đọc DB một lần rồi dùng cho cả match lẫn gần khớp
@@ -380,6 +404,153 @@ async function handleQuanTam(req, res) {
   });
 }
 
+// ---- Trang quản trị (admin) ----
+// Bảo vệ bằng biến môi trường ADMIN_PASSWORD. KHÔNG ghi mật khẩu vào code/git.
+// Local:  PowerShell  ->  $env:ADMIN_PASSWORD="matkhau"; node server.js
+// Vercel: Project Settings -> Environment Variables -> ADMIN_PASSWORD
+// Trang tĩnh ở /quan-tri; mọi API admin cần header 'x-admin-password' đúng.
+const ADMIN_PASSWORD = process.env.ADMIN_PASSWORD || '';
+
+// So sánh chống dò thời gian. Trả false nếu chưa cấu hình mật khẩu.
+function matKhauDung(req) {
+  if (!ADMIN_PASSWORD) return false;
+  const nhap = Buffer.from(String(req.headers['x-admin-password'] || ''));
+  const that = Buffer.from(ADMIN_PASSWORD);
+  if (nhap.length !== that.length) return false;
+  return crypto.timingSafeEqual(nhap, that);
+}
+
+// CHỈ những trọng số này được phép chỉnh từ trang admin (sandbox). Các số khác
+// trong RULES giữ nguyên. Không nhận key lạ -> không thể chèn dữ liệu phá logic.
+const KHOA_TRONG_SO = [
+  'BAN_KINH_KM', 'DUNG_SAI_PHUT', 'CHUYEN_DAI_KM', 'HANH_LANG_KM',
+  'BAN_KINH_DON_KM', 'PHAT_LECH_LOAI_XE', 'GAN_PHUT', 'GAN_BAN_KINH_KM',
+];
+
+// Nhãn tiếng Việt + mô tả cho từng trọng số, gửi cho trang admin để render form.
+const MO_TA_TRONG_SO = {
+  BAN_KINH_KM: { ten: 'Bán kính khớp (km)', mo_ta: 'Điểm khởi hành / kết thúc phải nằm trong bán kính này.' },
+  DUNG_SAI_PHUT: { ten: 'Dung sai giờ đón (phút)', mo_ta: 'Giờ đón hai bên lệch tối đa bấy nhiêu phút.' },
+  CHUYEN_DAI_KM: { ten: 'Ngưỡng chuyến dài (km)', mo_ta: 'Dài hơn mức này mới áp dụng luật hành lang quanh đường chim bay.' },
+  HANH_LANG_KM: { ten: 'Bề rộng hành lang (km)', mo_ta: 'Với chuyến dài, điểm đến khách nằm trong hành lang này quanh đường tài xế thì vẫn khớp.' },
+  BAN_KINH_DON_KM: { ten: 'Bán kính đón giữa đường (km)', mo_ta: 'Khách phải cách tuyến ≤ mức này để ra được điểm đón dọc đường.' },
+  PHAT_LECH_LOAI_XE: { ten: 'Điểm phạt lệch loại xe', mo_ta: 'Cộng vào điểm khi loại xe không đúng mong muốn — vẫn hiện nhưng xếp xuống dưới.' },
+  GAN_PHUT: { ten: 'Biên "gần khớp" theo giờ (phút)', mo_ta: 'Chỉ để gợi ý — lệch giờ trong mức này thì báo "gần khớp".' },
+  GAN_BAN_KINH_KM: { ten: 'Biên "gần khớp" theo vị trí (km)', mo_ta: 'Chỉ để gợi ý — lệch vị trí trong mức này thì báo "gần khớp".' },
+};
+
+// Trộn các trọng số admin gửi lên vào RULES gốc, chỉ nhận số hữu hạn ≥ 0.
+// RULES gốc KHÔNG bị đụng — đây là bản sao dùng riêng cho lần tính này (sandbox).
+function tronTrongSo(override) {
+  const r = { ...RULES };
+  if (override && typeof override === 'object') {
+    for (const k of KHOA_TRONG_SO) {
+      if (override[k] !== undefined && override[k] !== '' && override[k] !== null) {
+        const v = Number(override[k]);
+        if (Number.isFinite(v) && v >= 0) r[k] = v;
+      }
+    }
+  }
+  return r;
+}
+
+function handleAdminLogin(res, dung) {
+  if (dung) return json(res, 200, { ok: true });
+  return json(res, 401, {
+    error: ADMIN_PASSWORD
+      ? 'Sai mật khẩu'
+      : 'Máy chủ chưa cấu hình ADMIN_PASSWORD — xem hướng dẫn trong server.js',
+  });
+}
+
+/**
+ * Dữ liệu cho trang admin: toàn bộ chuyến + ma trận cặp KHỚP và GẦN KHỚP,
+ * tính theo trọng số truyền lên (sandbox — không ảnh hưởng web thật).
+ * Endpoint này là chỗ DUY NHẤT lộ toàn bộ SĐT/email, nên bắt buộc đúng mật khẩu.
+ */
+async function handleAdminData(req, res) {
+  if (!matKhauDung(req)) return handleAdminLogin(res, false);
+
+  let b = {};
+  try { b = await docBody(req); } catch { b = {}; }
+  const rules = tronTrongSo(b && b.rules);
+
+  const danhSach = await store.layTatCa();
+
+  const trips = danhSach.map((t) => ({
+    id: t.id, code: t.code, role: t.role, name: t.name, phone: t.phone, email: t.email,
+    start_label: t.start_label, end_label: t.end_label,
+    pickup: t.pickup, dropoff: t.dropoff,
+    days: t.days, tenNgay: tachNgay(t.days).map((d) => TEN_NGAY[d]).join(', '),
+    price: t.price, note: t.note,
+    vehicle_type: t.vehicle_type, vehicle_model: t.vehicle_model,
+    tenLoaiXe: t.vehicle_type ? TEN_LOAI_XE[t.vehicle_type] : null,
+    want_type: t.want_type,
+    coTuyen: Array.isArray(t.route) && t.route.length > 1,
+    route_km: t.route_km ?? null,
+    created_at: t.created_at,
+    // Toạ độ ĐẦY ĐỦ để vẽ bản đồ. Chỉ trang admin (đã nhập mật khẩu) mới nhận
+    // được — luồng người dùng thường vẫn KHÔNG bao giờ thấy toạ độ người khác.
+    start: [t.start_lat, t.start_lon],
+    end: [t.end_lat, t.end_lon],
+    route: (Array.isArray(t.route) && t.route.length > 1) ? t.route : null,
+  }));
+
+  // Mỗi cặp KHÔNG thứ tự chỉ xét MỘT lần; chỉ cặp ngược vai mới có thể khớp.
+  // xetCap đối xứng (vai trò quyết định ai là tài xế), nên xét (i,j) là đủ.
+  const khop = [];
+  const ganKhop = [];
+  for (let i = 0; i < danhSach.length; i++) {
+    for (let j = i + 1; j < danhSach.length; j++) {
+      const a = danhSach[i], c = danhSach[j];
+      if (a.role === c.role) continue;
+      const taiXe = a.role === 'driver' ? a : c;
+      const khach = a.role === 'driver' ? c : a;
+      const kq = xetCap(a, c, rules);
+      if (kq.khop) {
+        khop.push({
+          driverId: taiXe.id, driverCode: taiXe.code, driverName: taiXe.name,
+          riderId: khach.id, riderCode: khach.code, riderName: khach.name,
+          cachKhop: kq.cachKhop,
+          kmDau: Number(kq.kmDau.toFixed(2)),
+          kmCuoi: Number(kq.kmCuoi.toFixed(2)),
+          kmToiTuyen: kq.kmToiTuyen == null ? null : Number(kq.kmToiTuyen.toFixed(2)),
+          lechPhut: kq.lechPhut,
+          tenNgay: kq.tenNgay,
+          lechLoaiXe: kq.lechLoaiXe,
+          donGiuaDuong: kq.donGiuaDuong || null,
+          diem: Number(kq.diem.toFixed(2)),
+        });
+      } else {
+        const gk = xetGanKhop(a, c, rules);
+        if (gk.ganKhop) {
+          ganKhop.push({
+            aId: a.id, aName: a.name, aRole: a.role,
+            bId: c.id, bName: c.name, bRole: c.role,
+            driverName: taiXe.name, riderName: khach.name,
+            ma: gk.ma, lyDo: gk.lyDo, goiY: gk.goiY,
+            kmDau: Number(gk.kmDau.toFixed(2)),
+            kmCuoi: Number(gk.kmCuoi.toFixed(2)),
+            lechPhut: gk.lechPhut,
+            tenNgay: gk.tenNgay,
+          });
+        }
+      }
+    }
+  }
+  khop.sort((x, y) => x.diem - y.diem);
+
+  return json(res, 200, {
+    rules,
+    trongSo: KHOA_TRONG_SO.map((k) => ({ khoa: k, macDinh: RULES[k], ...MO_TA_TRONG_SO[k] })),
+    tongChuyen: trips.length,
+    soDriver: trips.filter((t) => t.role === 'driver').length,
+    soRider: trips.filter((t) => t.role === 'rider').length,
+    soCapKhop: khop.length,
+    trips, khop, ganKhop,
+  });
+}
+
 // ---- Phục vụ file tĩnh (có chặn path traversal) ----
 const MIME = {
   '.html': 'text/html; charset=utf-8',
@@ -445,10 +616,20 @@ async function handler(req, res) {
     }
     if (url.pathname.startsWith('/api/trips/') && req.method === 'GET') {
       return await handleXemChuyen(res, url.pathname.slice('/api/trips/'.length),
-        url.searchParams.get('name'), url.searchParams.get('phone'));
+        url.searchParams.get('phone'));
     }
     if (url.pathname === '/api/interest' && req.method === 'POST') {
       return await handleQuanTam(req, res);
+    }
+    // ---- Admin: trang bí mật + API bảo vệ bằng ADMIN_PASSWORD ----
+    if (url.pathname === '/quan-tri' || url.pathname === '/quan-tri/') {
+      return serveStatic(req, res, '/quan-tri.html');
+    }
+    if (url.pathname === '/api/admin/login' && req.method === 'POST') {
+      return handleAdminLogin(res, matKhauDung(req));
+    }
+    if (url.pathname === '/api/admin/data' && req.method === 'POST') {
+      return await handleAdminData(req, res);
     }
     // geo.js nay nam trong public/ -> serveStatic phuc vu binh thuong (giong app.js).
     return serveStatic(req, res, url.pathname);

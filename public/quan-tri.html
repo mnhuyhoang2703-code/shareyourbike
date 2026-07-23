@@ -1,0 +1,566 @@
+<!DOCTYPE html>
+<html lang="vi">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<meta name="robots" content="noindex, nofollow" />
+<title>Quản trị · ShareYourBike</title>
+<link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
+<style>
+  :root {
+    --accent: #ff5b8a; --indigo: #6c63ff;
+    --ink: #1f2333; --muted: #6b7180; --line: #e7e9f0;
+    --bg: #f5f6fb; --card: #ffffff;
+    --ok: #16a34a; --ok-bg: #e9f8ef; --warn: #b45309; --warn-bg: #fdf3e3;
+  }
+  * { box-sizing: border-box; }
+  body {
+    margin: 0; background: var(--bg); color: var(--ink);
+    font-family: system-ui, -apple-system, "Segoe UI", Roboto, sans-serif;
+    font-size: 14px; line-height: 1.5;
+  }
+  a { color: var(--indigo); }
+  h1, h2, h3 { margin: 0; font-weight: 700; }
+  .wrap { max-width: 1440px; margin: 0 auto; padding: 20px 16px 60px; }
+
+  /* ---- Bố cục 2 khung 40/60 (bản đồ luôn hiển thị bên phải) ---- */
+  .layout { display: flex; gap: 16px; align-items: flex-start; }
+  .left { flex: 0 0 40%; max-width: 40%; min-width: 0; }
+  .right { flex: 1 1 60%; min-width: 0; position: sticky; top: 16px; align-self: flex-start; }
+  .right .card { margin-bottom: 0; display: flex; flex-direction: column; height: calc(100vh - 32px); }
+  @media (max-width: 900px) {
+    .layout { flex-direction: column; }
+    .left, .right { flex: 1 1 auto; max-width: none; width: 100%; }
+    .right { order: -1; position: sticky; top: 0; z-index: 5; }
+    .right .card { height: 46vh; }
+  }
+
+  /* ---- Đăng nhập ---- */
+  .login { min-height: 100vh; display: grid; place-items: center; padding: 20px; }
+  .login-card {
+    background: var(--card); border: 1px solid var(--line); border-radius: 16px;
+    padding: 28px; width: 100%; max-width: 360px;
+    box-shadow: 0 10px 30px rgba(31,35,51,.06); text-align: center;
+  }
+  .login-card h1 { font-size: 20px; margin-bottom: 4px; }
+  .login-card p { color: var(--muted); margin: 0 0 18px; font-size: 13px; }
+  input, select, button { font: inherit; }
+  .fld {
+    width: 100%; padding: 11px 12px; border: 1px solid var(--line);
+    border-radius: 10px; background: #fff; margin-bottom: 12px;
+  }
+  .fld:focus { outline: 2px solid var(--indigo); border-color: transparent; }
+  .btn {
+    border: none; border-radius: 10px; padding: 11px 16px; cursor: pointer;
+    font-weight: 700; color: #fff; background: var(--accent);
+  }
+  .btn:hover { filter: brightness(1.04); }
+  .btn.block { width: 100%; }
+  .btn.ghost { background: #eef0f7; color: var(--ink); font-weight: 600; }
+  .btn.indigo { background: var(--indigo); }
+  .err { color: #dc2626; font-size: 13px; margin-top: 6px; min-height: 18px; }
+
+  /* ---- Header ---- */
+  .top { display: flex; align-items: center; justify-content: space-between; gap: 12px; margin-bottom: 16px; flex-wrap: wrap; }
+  .top h1 { font-size: 20px; }
+  .top h1 span { color: var(--accent); }
+  .stats { display: flex; gap: 10px; flex-wrap: wrap; margin-bottom: 18px; }
+  .stat {
+    background: var(--card); border: 1px solid var(--line); border-radius: 12px;
+    padding: 12px 16px; min-width: 110px;
+  }
+  .stat b { display: block; font-size: 22px; line-height: 1.1; }
+  .stat small { color: var(--muted); }
+
+  .card {
+    background: var(--card); border: 1px solid var(--line); border-radius: 14px;
+    padding: 16px; margin-bottom: 18px;
+  }
+  .card > h2 { font-size: 16px; margin-bottom: 4px; }
+  .card > .sub { color: var(--muted); font-size: 13px; margin-bottom: 14px; }
+
+  /* ---- Trọng số ---- */
+  .grid-ts { display: grid; grid-template-columns: repeat(auto-fill, minmax(230px, 1fr)); gap: 12px; }
+  .ts label { display: block; font-weight: 600; margin-bottom: 3px; }
+  .ts .desc { color: var(--muted); font-size: 12px; margin-bottom: 6px; min-height: 30px; }
+  .ts .row { display: flex; align-items: center; gap: 8px; }
+  .ts input { width: 100px; padding: 8px 10px; border: 1px solid var(--line); border-radius: 8px; }
+  .ts .def { color: var(--muted); font-size: 12px; }
+  .actions { display: flex; gap: 10px; margin-top: 14px; flex-wrap: wrap; align-items: center; }
+  .note { font-size: 12px; color: var(--warn); background: var(--warn-bg); padding: 8px 12px; border-radius: 8px; }
+
+  /* ---- Bộ lọc ---- */
+  .filters { display: flex; gap: 10px; flex-wrap: wrap; align-items: center; margin-bottom: 12px; }
+  .filters input, .filters select { padding: 8px 10px; border: 1px solid var(--line); border-radius: 8px; background: #fff; }
+  .filters .grow { flex: 1; min-width: 160px; }
+  .chip {
+    display: inline-flex; align-items: center; gap: 6px; background: #eef0f7;
+    border-radius: 999px; padding: 4px 10px; font-size: 12px; font-weight: 600;
+  }
+  .chip button { border: none; background: none; cursor: pointer; color: var(--muted); font-size: 14px; padding: 0; }
+
+  /* ---- Bảng ---- */
+  .tbl-scroll { overflow-x: auto; border: 1px solid var(--line); border-radius: 10px; }
+  table { width: 100%; border-collapse: collapse; font-size: 13px; min-width: 640px; }
+  th, td { text-align: left; padding: 9px 11px; border-bottom: 1px solid var(--line); vertical-align: top; }
+  th { background: #fafbff; font-weight: 700; color: var(--muted); position: sticky; top: 0; }
+  tbody tr:hover { background: #fafbff; }
+  tr.clickable { cursor: pointer; }
+  tr.sel { background: #fff2f6 !important; }
+  .empty { padding: 20px; text-align: center; color: var(--muted); }
+
+  .badge { display: inline-block; padding: 2px 8px; border-radius: 999px; font-size: 12px; font-weight: 700; }
+  .b-driver { background: #e8ecff; color: #3b40b8; }
+  .b-rider { background: #ffe8f0; color: #c02a5e; }
+  .b-gan { background: #e9f8ef; color: var(--ok); }
+  .b-tuyen { background: #e8ecff; color: #3b40b8; }
+  .b-hanh { background: #fdf3e3; color: var(--warn); }
+  .b-don { background: #efe9ff; color: #6b28cf; }
+  .b-lech { background: #fde8e8; color: #c02a2a; }
+  .mono { font-family: ui-monospace, "SF Mono", Menlo, monospace; font-size: 12px; }
+  .muted { color: var(--muted); }
+  .arr { color: var(--muted); }
+  .collapse-h { cursor: pointer; user-select: none; display: flex; align-items: center; gap: 8px; }
+  .collapse-h .tri { transition: transform .15s; }
+  .collapse-h.open .tri { transform: rotate(90deg); }
+  .hidden { display: none; }
+
+  /* ---- Bản đồ ---- */
+  #map { flex: 1; min-height: 300px; border-radius: 10px; z-index: 0; }
+  .map-hint { color: var(--muted); font-size: 13px; margin: 10px 0 0; }
+  .legend { display: flex; gap: 14px; flex-wrap: wrap; margin-top: 10px; font-size: 13px; }
+  .legend span { display: inline-flex; align-items: center; gap: 6px; }
+  .dot { width: 14px; height: 14px; border-radius: 50%; display: inline-block; }
+  .dot.driver { background: #6c63ff; } .dot.rider { background: #ff5b8a; }
+  .dot.ring { background: #fff; border: 3px solid #6c63ff; }
+  .pin-wrap { display: flex; justify-content: center; }
+  .pin {
+    color: #fff; border-radius: 999px; padding: 3px 10px; white-space: nowrap;
+    display: inline-flex; align-items: center; justify-content: center;
+    font-size: 13px; font-weight: 700; line-height: 1.25;
+    box-shadow: 0 1px 5px rgba(0,0,0,.5);
+  }
+  .pin b { font-weight: 800; margin-left: 5px; }
+</style>
+</head>
+<body>
+
+<!-- ===== Đăng nhập ===== -->
+<div id="login" class="login">
+  <form class="login-card" id="loginForm">
+    <h1>🔒 Trang quản trị</h1>
+    <p>ShareYourBike · Dichungxe.com</p>
+    <input id="pw" class="fld" type="password" placeholder="Mật khẩu quản trị" autocomplete="current-password" />
+    <button class="btn block" type="submit">Đăng nhập</button>
+    <div id="loginErr" class="err"></div>
+  </form>
+</div>
+
+<!-- ===== Bảng điều khiển ===== -->
+<div id="app" class="wrap hidden">
+  <div class="top">
+    <h1><span>◈</span> Quản trị ghép chuyến</h1>
+    <button class="btn ghost" id="logout">Đăng xuất</button>
+  </div>
+
+  <div class="stats" id="stats"></div>
+
+  <div class="layout">
+   <div class="left">
+
+  <!-- Trọng số -->
+  <div class="card">
+    <h2>Trọng số ghép chuyến</h2>
+    <div class="sub">Chỉnh số rồi bấm <b>Tính lại</b> để xem hệ thống ghép khác đi thế nào. Đây là <b>bản thử (sandbox)</b> — KHÔNG ảnh hưởng web thật của người dùng.</div>
+    <div class="grid-ts" id="trongSo"></div>
+    <div class="actions">
+      <button class="btn indigo" id="btnTinhLai">Tính lại (sandbox)</button>
+      <button class="btn ghost" id="btnMacDinh">Đặt lại mặc định</button>
+      <span class="note">Sandbox · không lưu, không đổi web thật</span>
+    </div>
+  </div>
+
+  <!-- Danh sách chuyến -->
+  <div class="card">
+    <h2>Người dùng đã đăng chuyến</h2>
+    <div class="sub">Toàn bộ chuyến trong hệ thống. Bấm một dòng để lọc các cặp ghép liên quan tới chuyến đó.</div>
+    <div class="filters">
+      <select id="fRole">
+        <option value="all">Tất cả vai trò</option>
+        <option value="driver">Người có xe (tìm khách)</option>
+        <option value="rider">Người đi nhờ (tìm xe)</option>
+      </select>
+      <input id="fText" class="grow" placeholder="Tìm theo tên, mã, địa điểm, SĐT…" />
+      <span id="selChip"></span>
+    </div>
+    <div class="tbl-scroll">
+      <table id="tblTrips">
+        <thead><tr>
+          <th>Mã</th><th>Vai trò</th><th>Tên</th><th>Liên hệ</th>
+          <th>Tuyến đi</th><th>Giờ</th><th>Ngày</th><th>Xe</th><th>Giá</th>
+        </tr></thead>
+        <tbody></tbody>
+      </table>
+    </div>
+  </div>
+
+  <!-- Cặp khớp -->
+  <div class="card">
+    <h2>Cặp hệ thống đánh giá KHỚP <span class="muted" id="khopCount"></span></h2>
+    <div class="sub">Mỗi dòng là một cặp người-có-xe ↔ người-đi-nhờ được ghép, kèm lý do khớp và các số đo để bạn kiểm tra độ chính xác.</div>
+    <div class="tbl-scroll">
+      <table id="tblKhop">
+        <thead><tr>
+          <th>Người có xe</th><th>Người đi nhờ</th><th>Cách khớp</th>
+          <th>Điểm đầu</th><th>Điểm cuối</th><th>Lệch giờ</th><th>Ngày chung</th><th>Điểm xếp hạng</th>
+        </tr></thead>
+        <tbody></tbody>
+      </table>
+    </div>
+  </div>
+
+  <!-- Gần khớp -->
+  <div class="card">
+    <h2 class="collapse-h" id="ganHead"><span class="tri">▶</span> Cặp GẦN KHỚP <span class="muted" id="ganCount"></span></h2>
+    <div class="sub">Trượt đúng 1 tiêu chí và còn cứu được — giúp phát hiện trường hợp hệ thống suýt ghép/suýt bỏ. Không hiện cho người dùng.</div>
+    <div id="ganBody" class="tbl-scroll hidden">
+      <table id="tblGan">
+        <thead><tr>
+          <th>Bên A</th><th>Bên B</th><th>Trượt tiêu chí</th><th>Gợi ý</th><th>Điểm đầu</th><th>Điểm cuối</th><th>Lệch giờ</th>
+        </tr></thead>
+        <tbody></tbody>
+      </table>
+    </div>
+  </div>
+
+   </div><!-- /.left -->
+
+   <div class="right">
+     <div class="card" id="mapCard">
+       <h2>Bản đồ</h2>
+       <div class="sub" id="mapTitle">Bấm một chuyến trong bảng, hoặc một cặp khớp / gần khớp, để xem điểm đi–đến trên bản đồ.</div>
+       <div id="map"></div>
+       <div class="legend">
+         <span><i class="dot driver"></i> Người có xe</span>
+         <span><i class="dot rider"></i> Người đi nhờ</span>
+         <span><i class="dot ring"></i> Vòng viền = điểm ĐẾN</span>
+         <span>· nét liền = tuyến thật · nét đứt = chim bay</span>
+       </div>
+     </div>
+   </div>
+  </div><!-- /.layout -->
+</div>
+
+<script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
+<script>
+const $ = (s) => document.querySelector(s);
+const esc = (s) => String(s == null ? '' : s).replace(/[&<>"']/g, (c) =>
+  ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
+
+let matKhau = '';
+let data = null;               // dữ liệu mới nhất từ server
+let selTripId = null;          // chuyến đang được chọn để lọc cặp
+let map = null, lopBanDo = null;
+const HCMC = [10.7769, 106.7009];
+
+// ================= Bản đồ =================
+function khoiTaoMap() {
+  if (map) { map.invalidateSize(); return; }
+  map = L.map('map', { scrollWheelZoom: true }).setView(HCMC, 12);
+  L.tileLayer('https://tile.openstreetmap.org/{z}/{x}/{y}.png', {
+    maxZoom: 19, attribution: '© OpenStreetMap',
+  }).addTo(map);
+  lopBanDo = L.layerGroup().addTo(map);
+  setTimeout(() => map.invalidateSize(), 200); // container vừa hiện -> cần đo lại
+}
+
+function iconChuyen(role, kind, gio) {
+  const mau = role === 'driver' ? '#6c63ff' : '#ff5b8a';
+  const chu = kind === 'start' ? 'Đi' : 'Đến';
+  const vien = kind === 'end' ? '3px solid #fff' : '2px solid #fff';
+  const nhan = gio ? `${chu}<b>${esc(gio)}</b>` : chu;
+  const rong = 120; // khung đủ rộng để căn giữa nhãn "Đến 08:30" trên đúng điểm
+  return L.divIcon({
+    className: '',
+    html: `<div class="pin-wrap" style="width:${rong}px"><div class="pin" style="background:${mau};border:${vien}">${nhan}</div></div>`,
+    iconSize: [rong, 26], iconAnchor: [rong / 2, 13],
+  });
+}
+
+// Vẽ một hoặc nhiều chuyến (theo id) lên bản đồ rồi fit khung nhìn.
+function hienTrenBanDo(ids, tieuDe) {
+  khoiTaoMap();
+  lopBanDo.clearLayers();
+  const diem = [];
+  ids.forEach((id) => {
+    const t = data.trips.find((x) => x.id === id);
+    if (!t || !t.start || !t.end) return;
+    const vaiTro = t.role === 'driver' ? 'Người có xe' : 'Người đi nhờ';
+    const mau = t.role === 'driver' ? '#6c63ff' : '#ff5b8a';
+    const gioDi = t.pickup || '';
+    const gioDen = t.dropoff || '';
+    L.marker(t.start, { icon: iconChuyen(t.role, 'start', gioDi) })
+      .bindPopup(`<b>${esc(t.name)}</b> · ${vaiTro}<br>Điểm đi: ${esc(t.start_label)}${gioDi ? '<br>Giờ đi: ' + esc(gioDi) : ''}`).addTo(lopBanDo);
+    L.marker(t.end, { icon: iconChuyen(t.role, 'end', gioDen) })
+      .bindPopup(`<b>${esc(t.name)}</b> · ${vaiTro}<br>Điểm đến: ${esc(t.end_label)}${gioDen ? '<br>Giờ đến: ' + esc(gioDen) : ''}`).addTo(lopBanDo);
+    if (t.route && t.route.length > 1) {
+      L.polyline(t.route, { color: mau, weight: 4, opacity: .85 }).addTo(lopBanDo);
+      t.route.forEach((p) => diem.push(p));
+    } else {
+      L.polyline([t.start, t.end], { color: mau, weight: 3, opacity: .7, dashArray: '6,7' }).addTo(lopBanDo);
+    }
+    diem.push(t.start, t.end);
+  });
+  if (diem.length) map.fitBounds(diem, { padding: [40, 40], maxZoom: 15 });
+  $('#mapTitle').textContent = tieuDe || '';
+}
+
+function xoaBanDo() {
+  if (lopBanDo) lopBanDo.clearLayers();
+  $('#mapTitle').textContent = 'Bấm một chuyến trong bảng, hoặc một cặp khớp / gần khớp, để xem điểm đi–đến trên bản đồ.';
+}
+
+// ---- Gọi API admin (kèm mật khẩu ở header) ----
+async function goiAdmin(path, body) {
+  const res = await fetch(path, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json', 'x-admin-password': matKhau },
+    body: JSON.stringify(body || {}),
+  });
+  const js = await res.json().catch(() => ({}));
+  if (!res.ok) throw new Error(js.error || ('Lỗi ' + res.status));
+  return js;
+}
+
+// ---- Đăng nhập ----
+$('#loginForm').addEventListener('submit', async (e) => {
+  e.preventDefault();
+  const pw = $('#pw').value;
+  $('#loginErr').textContent = '';
+  try {
+    matKhau = pw;
+    await goiAdmin('/api/admin/login', {});   // xác thực trước
+    await taiDuLieu();                          // rồi tải dữ liệu
+    $('#login').classList.add('hidden');
+    $('#app').classList.remove('hidden');
+    khoiTaoMap();
+  } catch (err) {
+    matKhau = '';
+    $('#loginErr').textContent = err.message;
+  }
+});
+
+$('#logout').addEventListener('click', () => {
+  matKhau = ''; data = null; selTripId = null;
+  $('#pw').value = '';
+  $('#app').classList.add('hidden');
+  $('#login').classList.remove('hidden');
+});
+
+// ---- Tải dữ liệu với trọng số hiện trên form ----
+async function taiDuLieu() {
+  const rules = docTrongSoTuForm();
+  data = await goiAdmin('/api/admin/data', { rules });
+  renderTrongSo();     // đồng bộ form (chỉ dựng lần đầu)
+  renderStats();
+  renderTrips();
+  renderKhop();
+  renderGanKhop();
+}
+
+// Đọc giá trị các ô trọng số đang hiển thị (rỗng nếu form chưa dựng).
+function docTrongSoTuForm() {
+  const out = {};
+  document.querySelectorAll('#trongSo input[data-khoa]').forEach((inp) => {
+    if (inp.value !== '') out[inp.dataset.khoa] = inp.value;
+  });
+  return out;
+}
+
+// ---- Render trọng số (dựng 1 lần theo metadata từ server) ----
+let trongSoDaDung = false;
+function renderTrongSo() {
+  if (trongSoDaDung || !data) return;
+  const host = $('#trongSo');
+  host.innerHTML = data.trongSo.map((t) => `
+    <div class="ts">
+      <label>${esc(t.ten)}</label>
+      <div class="desc">${esc(t.mo_ta)}</div>
+      <div class="row">
+        <input type="number" step="any" min="0" data-khoa="${esc(t.khoa)}"
+               value="${esc(data.rules[t.khoa])}" />
+        <span class="def">mặc định ${esc(t.macDinh)}</span>
+      </div>
+    </div>`).join('');
+  trongSoDaDung = true;
+}
+
+$('#btnTinhLai').addEventListener('click', async () => {
+  $('#btnTinhLai').textContent = 'Đang tính…';
+  $('#btnTinhLai').disabled = true;
+  try { await taiDuLieu(); }
+  catch (err) { alert(err.message); }
+  finally { $('#btnTinhLai').textContent = 'Tính lại (sandbox)'; $('#btnTinhLai').disabled = false; }
+});
+
+$('#btnMacDinh').addEventListener('click', async () => {
+  data.trongSo.forEach((t) => {
+    const inp = document.querySelector(`#trongSo input[data-khoa="${t.khoa}"]`);
+    if (inp) inp.value = t.macDinh;
+  });
+  await taiDuLieu();
+});
+
+// ---- Thống kê ----
+function renderStats() {
+  $('#stats').innerHTML = `
+    <div class="stat"><b>${data.tongChuyen}</b><small>Tổng chuyến</small></div>
+    <div class="stat"><b>${data.soDriver}</b><small>Người có xe</small></div>
+    <div class="stat"><b>${data.soRider}</b><small>Người đi nhờ</small></div>
+    <div class="stat"><b>${data.soCapKhop}</b><small>Cặp khớp</small></div>
+    <div class="stat"><b>${data.ganKhop.length}</b><small>Cặp gần khớp</small></div>`;
+}
+
+// ---- Bộ lọc danh sách chuyến ----
+$('#fRole').addEventListener('change', renderTrips);
+$('#fText').addEventListener('input', renderTrips);
+
+function renderTrips() {
+  const role = $('#fRole').value;
+  const q = $('#fText').value.trim().toLowerCase();
+  const rows = data.trips.filter((t) => {
+    if (role !== 'all' && t.role !== role) return false;
+    if (!q) return true;
+    return [t.name, t.code, t.phone, t.email, t.start_label, t.end_label]
+      .some((v) => String(v || '').toLowerCase().includes(q));
+  });
+
+  const tb = $('#tblTrips tbody');
+  if (!rows.length) { tb.innerHTML = `<tr><td colspan="9" class="empty">Không có chuyến nào khớp bộ lọc.</td></tr>`; }
+  else tb.innerHTML = rows.map((t) => {
+    const badge = t.role === 'driver'
+      ? '<span class="badge b-driver">Có xe</span>'
+      : '<span class="badge b-rider">Đi nhờ</span>';
+    const xe = t.role === 'driver'
+      ? `${esc(t.tenLoaiXe || '—')}${t.vehicle_model ? '<br><span class="muted">' + esc(t.vehicle_model) + '</span>' : ''}${t.coTuyen ? '<br><span class="muted mono">có tuyến</span>' : ''}`
+      : `<span class="muted">muốn: ${esc(t.want_type === 'any' || !t.want_type ? 'bất kỳ' : t.tenLoaiXe || t.want_type)}</span>`;
+    const gio = esc(t.pickup) + (t.dropoff ? ` <span class="muted">→ ${esc(t.dropoff)}</span>` : '');
+    return `<tr class="clickable ${selTripId === t.id ? 'sel' : ''}" data-id="${t.id}">
+      <td class="mono">${esc(t.code)}</td>
+      <td>${badge}</td>
+      <td>${esc(t.name)}</td>
+      <td class="mono">${esc(t.phone)}${t.email ? '<br><span class="muted">' + esc(t.email) + '</span>' : ''}</td>
+      <td>${esc(t.start_label)}<br><span class="arr">↓</span><br>${esc(t.end_label)}</td>
+      <td>${gio}</td>
+      <td>${esc(t.tenNgay)}</td>
+      <td>${xe}</td>
+      <td>${Number(t.price).toLocaleString('vi-VN')}đ</td>
+    </tr>`;
+  }).join('');
+
+  tb.querySelectorAll('tr.clickable').forEach((tr) => {
+    tr.addEventListener('click', () => chonChuyen(Number(tr.dataset.id)));
+  });
+}
+
+function chonChuyen(id) {
+  selTripId = (selTripId === id) ? null : id;
+  renderTrips(); renderKhop(); renderGanKhop(); renderSelChip();
+  if (selTripId != null) {
+    const t = data.trips.find((x) => x.id === selTripId);
+    hienTrenBanDo([selTripId], t ? `Chuyến của ${t.name} (${t.code})` : '');
+  } else xoaBanDo();
+}
+
+function renderSelChip() {
+  const host = $('#selChip');
+  if (selTripId == null) { host.innerHTML = ''; return; }
+  const t = data.trips.find((x) => x.id === selTripId);
+  host.innerHTML = `<span class="chip">Lọc theo: ${esc(t ? t.name + ' (' + t.code + ')' : id)}
+    <button title="Bỏ lọc">✕</button></span>`;
+  host.querySelector('button').addEventListener('click', () => { selTripId = null; renderTrips(); renderKhop(); renderGanKhop(); renderSelChip(); });
+}
+
+// ---- Cặp khớp ----
+const NHAN_KHOP = {
+  'gan-nhau':  ['Gần nhau', 'b-gan'],
+  'tren-tuyen':['Trên tuyến', 'b-tuyen'],
+  'hanh-lang': ['Hành lang', 'b-hanh'],
+  'don-tuyen': ['Đón giữa đường', 'b-don'],
+};
+
+function renderKhop() {
+  let rows = data.khop;
+  if (selTripId != null) rows = rows.filter((m) => m.driverId === selTripId || m.riderId === selTripId);
+  $('#khopCount').textContent = `(${rows.length}${selTripId != null ? ' / ' + data.khop.length : ''})`;
+
+  const tb = $('#tblKhop tbody');
+  if (!rows.length) { tb.innerHTML = `<tr><td colspan="8" class="empty">Không có cặp khớp nào.</td></tr>`; return; }
+  tb.innerHTML = rows.map((m) => {
+    const [nhan, cls] = NHAN_KHOP[m.cachKhop] || [m.cachKhop, 'b-gan'];
+    const cuoi = m.cachKhop === 'tren-tuyen' && m.kmToiTuyen != null
+      ? `${m.kmToiTuyen} km tới tuyến`
+      : `${m.kmCuoi} km`;
+    const don = m.donGiuaDuong
+      ? `<br><span class="muted">đón ${esc(m.donGiuaDuong.gioDon)}, đi bộ ${m.donGiuaDuong.kmToiDiemDon.toFixed ? m.donGiuaDuong.kmToiDiemDon.toFixed(2) : m.donGiuaDuong.kmToiDiemDon}km</span>`
+      : '';
+    const lech = m.lechPhut == null ? '<span class="muted">—</span>' : m.lechPhut + ' phút';
+    const lechXe = m.lechLoaiXe ? ' <span class="badge b-lech">lệch loại xe</span>' : '';
+    return `<tr class="clickable" data-d="${m.driverId}" data-r="${m.riderId}">
+      <td>${esc(m.driverName)}<br><span class="muted mono">${esc(m.driverCode)}</span></td>
+      <td>${esc(m.riderName)}<br><span class="muted mono">${esc(m.riderCode)}</span></td>
+      <td><span class="badge ${cls}">${esc(nhan)}</span>${lechXe}${don}</td>
+      <td>${m.kmDau} km</td>
+      <td>${cuoi}</td>
+      <td>${lech}</td>
+      <td>${esc(m.tenNgay)}</td>
+      <td class="mono">${m.diem}</td>
+    </tr>`;
+  }).join('');
+  tb.querySelectorAll('tr.clickable').forEach((tr) => {
+    tr.addEventListener('click', () => {
+      const d = Number(tr.dataset.d), r = Number(tr.dataset.r);
+      const dn = data.trips.find((x) => x.id === d), rn = data.trips.find((x) => x.id === r);
+      hienTrenBanDo([d, r], `Cặp khớp: ${dn ? dn.name : ''} ↔ ${rn ? rn.name : ''}`);
+    });
+  });
+}
+
+// ---- Gần khớp ----
+$('#ganHead').addEventListener('click', () => {
+  $('#ganHead').classList.toggle('open');
+  $('#ganBody').classList.toggle('hidden');
+});
+
+function renderGanKhop() {
+  let rows = data.ganKhop;
+  if (selTripId != null) rows = rows.filter((g) => g.aId === selTripId || g.bId === selTripId);
+  $('#ganCount').textContent = `(${rows.length}${selTripId != null ? ' / ' + data.ganKhop.length : ''})`;
+
+  const tb = $('#tblGan tbody');
+  if (!rows.length) { tb.innerHTML = `<tr><td colspan="7" class="empty">Không có cặp gần khớp nào.</td></tr>`; return; }
+  tb.innerHTML = rows.map((g) => {
+    const badgeA = g.aRole === 'driver' ? 'b-driver' : 'b-rider';
+    const badgeB = g.bRole === 'driver' ? 'b-driver' : 'b-rider';
+    const lech = g.lechPhut == null ? '<span class="muted">—</span>' : g.lechPhut + ' phút';
+    return `<tr class="clickable" data-a="${g.aId}" data-b="${g.bId}">
+      <td>${esc(g.aName)} <span class="badge ${badgeA}">${g.aRole === 'driver' ? 'Có xe' : 'Đi nhờ'}</span></td>
+      <td>${esc(g.bName)} <span class="badge ${badgeB}">${g.bRole === 'driver' ? 'Có xe' : 'Đi nhờ'}</span></td>
+      <td>${esc(g.lyDo)}</td>
+      <td class="muted">${esc(g.goiY)}</td>
+      <td>${g.kmDau} km</td>
+      <td>${g.kmCuoi} km</td>
+      <td>${lech}</td>
+    </tr>`;
+  }).join('');
+  tb.querySelectorAll('tr.clickable').forEach((tr) => {
+    tr.addEventListener('click', () => {
+      const a = Number(tr.dataset.a), b = Number(tr.dataset.b);
+      const an = data.trips.find((x) => x.id === a), bn = data.trips.find((x) => x.id === b);
+      hienTrenBanDo([a, b], `Gần khớp: ${an ? an.name : ''} ↔ ${bn ? bn.name : ''}`);
+    });
+  });
+}
+</script>
+</body>
+</html>
