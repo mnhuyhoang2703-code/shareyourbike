@@ -12,3 +12,7 @@ memory.md
 01_playbook_web_dev.md
 02_toi_uu_token.md
 50_chuyen_mau.csv
+
+# File token bi mat - khong dua len repo
+token turso.txt
+token*.txt
