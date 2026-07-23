@@ -3,7 +3,7 @@
 <head>
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1">
-  <title>ShareYourBike — Đi chung xe TPHCM</title>
+  <title>ShareYourBike — Đi chung tuyến ở TPHCM</title>
   <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css">
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
@@ -13,38 +13,74 @@
 </head>
 <body>
 
-  <!-- ============ MÀN CHÀO: GIỚI THIỆU + ĐỒNG Ý ============ -->
-  <div id="welcome" class="welcome-overlay">
-    <div class="welcome-card">
-      <div class="welcome-emoji">🛵💕</div>
-      <h1 class="welcome-title">ShareYourBike</h1>
-      <p class="welcome-sub">Đi chung tuyến, đỡ nhau một đoạn đường 🌸</p>
+  <!-- ============ LANDING: GIỚI THIỆU + ĐỒNG Ý ============ -->
+  <div id="welcome" class="landing">
+    <div class="landing-inner">
 
-      <div class="welcome-body">
-        <p>Đây là nơi kết nối những bạn <strong>cùng hành trình di chuyển</strong> ở TPHCM để rủ nhau đi chung cho vui, tiết kiệm và bớt kẹt xe.</p>
-        <div class="welcome-note">
-          <span class="welcome-note-icon">💡</span>
-          <p>Website <strong>chỉ giới thiệu và cung cấp thông tin liên lạc</strong> giữa những người có cùng hành trình để các bạn <strong>tự liên hệ nhau</strong>. Website <strong>không nhằm mục đích thu phí</strong> người dùng.</p>
+      <header class="landing-nav reveal" style="--d:0ms">
+        <div class="landing-brand">🛵 ShareYourBike</div>
+        <div class="landing-nav-note">Đi chung tuyến · TPHCM</div>
+      </header>
+
+      <section class="hero">
+        <div class="hero-text">
+          <span class="hero-eyebrow reveal" style="--d:60ms">Đi làm cùng đường • Chia sẻ chi phí</span>
+          <h1 class="hero-title reveal" style="--d:120ms">
+            Mỗi ngày, hàng triệu chuyến xe lăn bánh với <span class="hl">một chỗ ngồi bỏ trống.</span>
+          </h1>
+          <p class="hero-sub reveal" style="--d:200ms">
+            ShareYourBike kết nối những người vốn đã đi chung một cung đường mỗi ngày —
+            để chia sẻ chi phí, bớt kẹt xe và đi lại vui hơn.
+          </p>
+          <div class="hero-cta reveal" style="--d:280ms">
+            <button class="btn btn-primary hero-btn" id="btn-go-dang" disabled>🛵 Đăng tuyến của tôi</button>
+            <button class="btn btn-ghost hero-btn" id="btn-go-xem" disabled>🔍 Tìm người cùng đường</button>
+          </div>
+          <label class="hero-agree reveal" style="--d:340ms">
+            <input type="checkbox" id="agree-check">
+            <span>Mình đã đọc và đồng ý: website chỉ <strong>giới thiệu thông tin liên lạc</strong> giữa người cùng hành trình để hai bên <strong>tự liên hệ</strong>, <strong>không thu phí</strong> người dùng.</span>
+          </label>
+          <p class="hero-hint" id="hero-hint">Tích vào ô đồng ý ở trên để bắt đầu nhé 🌸</p>
         </div>
-      </div>
 
-      <label class="welcome-agree">
-        <input type="checkbox" id="agree-check">
-        <span>Mình đã đọc và <strong>đồng ý / đã hiểu</strong> nội dung trên</span>
-      </label>
+        <div class="hero-visual reveal" style="--d:240ms" aria-hidden="true">
+          <div class="hero-orb"></div>
+          <div class="hero-seal hero-seal-blue"></div>
+          <div class="hero-seal hero-seal-pink"></div>
+        </div>
+      </section>
 
-      <p class="welcome-choose" id="welcome-choose-hint">Bạn muốn làm gì?</p>
-      <div class="welcome-actions">
-        <button class="btn btn-primary welcome-btn" id="btn-go-dang" disabled>🛵 Đăng chuyến</button>
-        <button class="btn btn-ghost welcome-btn" id="btn-go-xem" disabled>🔍 Xem kết quả</button>
-      </div>
+      <section class="steps">
+        <h2 class="steps-title reveal" style="--d:120ms">Chỉ 3 bước, không cần tài khoản</h2>
+        <div class="steps-grid">
+          <div class="step reveal" style="--d:180ms">
+            <div class="step-ico">1</div>
+            <h3>Đăng tuyến</h3>
+            <p>Nhập điểm đi, điểm đến, giờ giấc và loại xe. Xong trong một phút.</p>
+          </div>
+          <div class="step reveal" style="--d:260ms">
+            <div class="step-ico">2</div>
+            <h3>Ghép tuyến</h3>
+            <p>Hệ thống tự tìm những người có cung đường trùng với bạn.</p>
+          </div>
+          <div class="step reveal" style="--d:340ms">
+            <div class="step-ico">3</div>
+            <h3>Kết nối</h3>
+            <p>Cả hai cùng bấm quan tâm thì mới hiện số liên lạc để tự hẹn nhau.</p>
+          </div>
+        </div>
+      </section>
+
+      <footer class="landing-foot reveal" style="--d:120ms">
+        Website chỉ <strong>kết nối</strong> những người cùng hành trình. Hai bên tự quyết định có liên hệ hay không — ShareYourBike không thu phí và không tham gia vào chuyến đi.
+      </footer>
     </div>
   </div>
 
   <header class="topbar">
     <div class="brand">ShareYourBike</div>
     <nav class="tabs">
-      <button class="tab is-active" data-view="dang">Đăng chuyến</button>
+      <button class="tab is-active" data-view="dang">Đăng tuyến</button>
       <button class="tab" data-view="xem">Xem kết quả</button>
     </nav>
   </header>
@@ -57,20 +93,20 @@
         <form id="form-chuyen" novalidate>
 
           <div class="block">
-            <span class="block-title">Bạn là ai?</span>
+            <span class="block-title">Bạn muốn gì?</span>
             <div class="roles">
               <label class="role">
                 <input type="radio" name="role" value="driver" checked>
                 <span class="role-box">
-                  <span class="role-name">Tôi có xe</span>
-                  <span class="role-desc">Còn chỗ trống, muốn chở thêm người</span>
+                  <span class="role-name">Chia sẻ chỗ trống</span>
+                  <span class="role-desc">Mình có xe, còn chỗ muốn chở thêm người cùng đường</span>
                 </span>
               </label>
               <label class="role">
                 <input type="radio" name="role" value="rider">
                 <span class="role-box">
-                  <span class="role-name">Tôi cần đi nhờ</span>
-                  <span class="role-desc">Đang tìm xe cùng tuyến</span>
+                  <span class="role-name">Tìm người cùng đường</span>
+                  <span class="role-desc">Mình đang tìm xe đi chung cùng tuyến</span>
                 </span>
               </label>
             </div>
@@ -83,11 +119,11 @@
               <div class="roles roles-xe">
                 <label class="role">
                   <input type="radio" name="vehicle_type" value="bike" checked>
-                  <span class="role-box"><span class="role-name">Xe máy</span></span>
+                  <span class="role-box"><span class="role-name">🛵 Xe máy</span></span>
                 </label>
                 <label class="role">
                   <input type="radio" name="vehicle_type" value="car">
-                  <span class="role-box"><span class="role-name">Xe hơi</span></span>
+                  <span class="role-box"><span class="role-name">🚗 Xe hơi</span></span>
                 </label>
               </div>
             </div>
@@ -110,11 +146,11 @@
                 </label>
                 <label class="role">
                   <input type="radio" name="want_type" value="bike">
-                  <span class="role-box"><span class="role-name">Xe máy</span></span>
+                  <span class="role-box"><span class="role-name">🛵 Xe máy</span></span>
                 </label>
                 <label class="role">
                   <input type="radio" name="want_type" value="car">
-                  <span class="role-box"><span class="role-name">Xe hơi</span></span>
+                  <span class="role-box"><span class="role-name">🚗 Xe hơi</span></span>
                 </label>
               </div>
               <p class="micro">Chọn loại cụ thể thì loại đó được ưu tiên lên đầu, các xe khác vẫn hiện bên dưới.</p>
@@ -191,7 +227,7 @@
 
           <p class="privacy">Số điện thoại của bạn <strong>chỉ hiện ra khi cả hai bên cùng bấm quan tâm</strong>.</p>
 
-          <button type="submit" class="btn btn-primary" id="btn-dang">Đăng chuyến</button>
+          <button type="submit" class="btn btn-primary" id="btn-dang">Đăng tuyến</button>
           <div id="form-errors" class="errors" hidden></div>
         </form>
       </section>
@@ -199,7 +235,7 @@
       <!-- ============ MÀN 2: ĐĂNG XONG, HIỆN MÃ ============ -->
       <section id="view-xong" class="view" hidden>
         <div class="done">
-          <div class="done-title">Đã đăng chuyến 🎉</div>
+          <div class="done-title">Đã đăng tuyến 🎉</div>
           <p class="micro">Đây là <strong>mã đi chung</strong> của bạn. Lần sau quay lại xem kết quả, hãy nhập <strong>mã này + đúng tên + số điện thoại</strong> vừa dùng. Nhớ lưu lại nhé!</p>
           <div class="code-box"><span id="ma-cua-toi"></span></div>
           <button class="btn btn-ghost" id="btn-copy">Sao chép mã</button>
@@ -212,7 +248,7 @@
       <section id="view-xem" class="view" hidden>
         <div class="block">
           <span class="block-title">Đăng nhập xem kết quả</span>
-          <p class="micro">Nhập đúng <strong>mã đi chung + tên + số điện thoại</strong> bạn đã dùng khi đăng chuyến.</p>
+          <p class="micro">Nhập đúng <strong>mã đi chung + tên + số điện thoại</strong> bạn đã dùng khi đăng tuyến.</p>
           <div class="field">
             <label for="ma-input">Mã đi chung</label>
             <input id="ma-input" type="text" placeholder="VD: K7M2PQR4" maxlength="8" autocomplete="off">
@@ -241,5 +277,15 @@
   <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
   <script src="/geo.js"></script>
   <script src="app.js"></script>
+  <!-- Draft-only: cho ẩn/hiện dòng gợi ý tick khi đã đồng ý (không đụng app.js gốc) -->
+  <script>
+    (function(){
+      var chk = document.getElementById('agree-check');
+      var hint = document.getElementById('hero-hint');
+      if (chk && hint) chk.addEventListener('change', function(){
+        hint.style.visibility = chk.checked ? 'hidden' : 'visible';
+      });
+    })();
+  </script>
 </body>
 </html>

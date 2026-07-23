@@ -1,4 +1,5 @@
 node_modules/
+drafts/
 *.db
 *.db-journal
 *.db.bak_*
