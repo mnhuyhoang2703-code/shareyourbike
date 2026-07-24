@@ -647,7 +647,11 @@ body {
   .layout { grid-template-columns: 1fr; height: auto; }
   .map { order: -1; height: 42vh; }
   .panel { padding: 16px; }
-  .roles { grid-template-columns: 1fr; }
+  /* Chỉ ép khối chọn VAI TRÒ (driver/rider/both) xuống 1 cột trên màn hẹp.
+     Khối chọn XE (.roles-xe: 2 ô Xe máy/Xe hơi, hoặc 3 ô khi là "mong muốn")
+     giữ nguyên dàn ngang — loại trừ bằng :not(.roles-xe) thay vì để .roles
+     (chung) đè mất grid-template-columns của .roles-xe/.roles-3. */
+  .roles:not(.roles-xe) { grid-template-columns: 1fr; }
   .row { grid-template-columns: 1fr; }
   .days { flex-wrap: wrap; }
   .day { flex: 0 1 40px; } /* màn hẹp: quay lại ô cỡ cố định, tránh vỡ dòng lệch cỡ */
