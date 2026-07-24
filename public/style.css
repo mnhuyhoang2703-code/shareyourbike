@@ -232,10 +232,10 @@ body {
 .tab:hover { background: var(--surface); }
 .tab.is-active { background: var(--accent-soft); color: var(--accent-hover); }
 
-/* =================== BỐ CỤC (map lớn hơn ~72%) =================== */
+/* =================== BỐ CỤC (khung nhập 40% / bản đồ 60%, tỉ lệ 4/6) =================== */
 .layout {
   display: grid;
-  grid-template-columns: 400px 1fr;
+  grid-template-columns: minmax(360px, 4fr) minmax(0, 6fr);
   height: calc(100vh - 55px);
 }
 .panel { padding: 22px 24px; overflow-y: auto; background: var(--bg); }
@@ -368,11 +368,14 @@ body {
 }
 
 /* =================== NGÀY TRONG TUẦN =================== */
+/* Dàn đều 7 ô trên hết chiều rộng khung (panel rộng hơn thì ô cũng giãn theo,
+   không co cụm về bên trái). */
 .days { display: flex; gap: 6px; }
+.day { flex: 1; }
 .day span {
   display: grid;
   place-items: center;
-  width: 40px;
+  width: 100%;
   height: 38px;
   font-size: 12.5px;
   font-weight: 700;
@@ -637,12 +640,30 @@ body {
   .steps-grid { grid-template-columns: 1fr; }
 }
 @media (max-width: 760px) {
-  .layout { grid-template-columns: 1fr; grid-template-rows: 42vh auto; height: auto; }
-  .map { order: -1; }
+  /* Chiều cao đặt trực tiếp trên #map (không đặt qua grid-template-rows của .layout)
+     vì #map có lúc là item của .layout (màn "xong"/"xem"), có lúc bị JS chuyển hẳn
+     vào .map-slot-mobile (màn "đăng chuyến") — grid-template-rows cố định sẽ ép
+     .panel co lại còn 42vh khi .layout chỉ còn đúng 1 item. */
+  .layout { grid-template-columns: 1fr; height: auto; }
+  .map { order: -1; height: 42vh; }
   .panel { padding: 16px; }
   .roles { grid-template-columns: 1fr; }
   .row { grid-template-columns: 1fr; }
   .days { flex-wrap: wrap; }
+  .day { flex: 0 1 40px; } /* màn hẹp: quay lại ô cỡ cố định, tránh vỡ dòng lệch cỡ */
+
+  /* Ô chứa bản đồ ngay dưới phần nhập địa chỉ (chỉ màn ĐĂNG CHUYẾN — app.js
+     chuyển hẳn #map vào đây bằng JS). Rỗng thì không chiếm chỗ. */
+  .map-slot-mobile:not(:empty) {
+    height: 42vh;
+    margin-bottom: 18px;
+    border-radius: var(--radius);
+    overflow: hidden;
+    border: 1.5px solid var(--border);
+    box-shadow: var(--shadow-sm);
+  }
+  .map-slot-mobile:not(:empty) .map { height: 100%; }
+
   .landing-inner { padding: 20px 18px 32px; }
   .hero-cta { flex-direction: column; }
   .hero-btn { width: 100%; }

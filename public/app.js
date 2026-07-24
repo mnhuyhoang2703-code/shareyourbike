@@ -251,7 +251,38 @@ function showView(ten) {
   // Ở màn kết quả, hải cẩu của mình mang nhãn "Bạn" + to hơn để phân biệt với người khác
   nhanDiemToi = ten === 'xem' ? 'Bạn' : null;
   capNhatIconToi();
+
+  dongBoViTriBanDoDiDong();
 }
+
+// ================= BẢN ĐỒ TRÊN ĐIỆN THOẠI: chuyển xuống dưới ô địa chỉ =================
+// Trên máy tính bản đồ LUÔN là cột phải cố định (không đụng gì ở đây).
+// Trên điện thoại, riêng màn ĐĂNG CHUYẾN mới chuyển hẳn #map vào #map-slot-mobile
+// (ngay dưới khối "Tuyến đi hằng ngày") để nhập xong địa chỉ là kéo/thả marker được
+// luôn, không phải cuộn ngược lên đầu trang. Màn "xong"/"xem kết quả" giữ nguyên vị
+// trí bản đồ như trước (trên cùng) — không đổi hành vi ngoài phạm vi yêu cầu.
+const NGUONG_DI_DONG = 760;
+const mapEl = document.getElementById('map');
+const mapSlotDiDong = document.getElementById('map-slot-mobile');
+const layoutGoc = document.querySelector('.layout'); // cha gốc của #map trên máy tính
+
+function dongBoViTriBanDoDiDong() {
+  const laDiDong = window.innerWidth <= NGUONG_DI_DONG;
+  const dangOManDang = !views.dang.hidden;
+  const choDich = (laDiDong && dangOManDang) ? mapSlotDiDong : layoutGoc;
+  if (mapEl.parentElement === choDich) return; // đã đúng chỗ, khỏi làm gì
+  choDich.appendChild(mapEl); // .layout: nối cuối = đúng vị trí gốc (sau .panel)
+  // Đổi container thì Leaflet phải tính lại kích thước, không thì bản đồ vẽ lệch/trắng.
+  requestAnimationFrame(() => map.invalidateSize());
+}
+
+let henGioResize;
+window.addEventListener('resize', () => {
+  clearTimeout(henGioResize);
+  henGioResize = setTimeout(dongBoViTriBanDoDiDong, 150);
+});
+
+dongBoViTriBanDoDiDong(); // đặt đúng chỗ ngay từ lúc tải trang
 document.querySelectorAll('.tab').forEach((t) => {
   t.addEventListener('click', () => showView(t.dataset.view));
 });
