@@ -310,6 +310,21 @@ const mau = (o = {}) => ({
     (await fetch(BASE + '/api/trips/' + caHai.code + '?phone=0900000000')
       .then((r) => r.status)) === 403);
 
+  // BUG da gap: hang driver va hang rider cua CUNG 1 nguoi (cung SDT) bi tu khop
+  // voi nhau (khac id nen khong bi loc theo id). Phai loai theo SDT.
+  ok('Hang RIDER cua "ca hai" KHONG tu khop voi chinh hang DRIVER cua no (cung sdt)',
+    !vaiRider.matches.some((m) => m.name === 'Ca Hai Vai'));
+  ok('Hang DRIVER cua "ca hai" KHONG tu khop voi chinh hang RIDER cua no (cung sdt)',
+    !vaiDriver.matches.some((m) => m.name === 'Ca Hai Vai'));
+  ok('Cung khong tu hien o muc "gan khop"',
+    !vaiRider.ganKhop.some((g) => g.name === 'Ca Hai Vai')
+    && !vaiDriver.ganKhop.some((g) => g.name === 'Ca Hai Vai'));
+  const tuQuanTamChinhMinh = await post('/api/interest', {
+    code: caHai.code, targetId: vaiDriver.me.id,
+  });
+  ok('Hang rider khong the bay to quan tam voi hang driver cua chinh minh -> 400',
+    tuQuanTamChinhMinh.status === 400);
+
   // Nguoi rider khac khop voi hang DRIVER cua "ca hai"
   const riderKhopVoiCaHai = (await post('/api/trips', mau({
     role: 'rider', vehicle_type: null, name: 'Rider Khop Ca Hai', phone: '0909990002',

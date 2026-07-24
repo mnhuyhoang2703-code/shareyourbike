@@ -344,11 +344,26 @@ function xetGanKhop(me, other, rules = RULES) {
   };
 }
 
+// Chỉ giữ lại chữ số để so trùng SĐT — cùng cách chuẩn hoá với server.js
+// (server đã lưu phone dạng chuỗi số thuần nên đây chủ yếu là phòng hờ).
+const chuanSdtMatch = (s) => String(s || '').replace(/\D/g, '');
+
+/**
+ * Cùng một người = cùng SĐT. Người chọn "Cả hai" được lưu thành 2 hàng
+ * (driver + rider) khác `id` nhưng CÙNG SĐT — phải loại trừ để không tự khớp
+ * với chính mình ở vai còn lại. Chỉ so khi CẢ HAI đều có SĐT (fixture test
+ * thuần không khai phone thì bỏ qua so sánh này, tránh false-positive rỗng == rỗng).
+ */
+function laCungNguoi(a, b) {
+  const sa = chuanSdtMatch(a.phone), sb = chuanSdtMatch(b.phone);
+  return Boolean(sa) && sa === sb;
+}
+
 /** Lọc toàn bộ danh sách, trả về các chuyến khớp đã xếp hạng. */
 function timMatch(me, danhSach, rules = RULES) {
   const ketQua = [];
   for (const other of danhSach) {
-    if (other.id === me.id) continue;
+    if (other.id === me.id || laCungNguoi(me, other)) continue;
     const kq = xetCap(me, other, rules);
     if (kq.khop) ketQua.push({ trip: other, ...kq });
   }
@@ -359,7 +374,7 @@ function timMatch(me, danhSach, rules = RULES) {
 function timGanKhop(me, danhSach, rules = RULES) {
   const ketQua = [];
   for (const other of danhSach) {
-    if (other.id === me.id) continue;
+    if (other.id === me.id || laCungNguoi(me, other)) continue;
     const kq = xetGanKhop(me, other, rules);
     if (kq.ganKhop) ketQua.push({ trip: other, ...kq });
   }

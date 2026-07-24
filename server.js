@@ -540,6 +540,8 @@ async function handleAdminData(req, res) {
     for (let j = i + 1; j < danhSach.length; j++) {
       const a = danhSach[i], c = danhSach[j];
       if (a.role === c.role) continue;
+      // Cùng SĐT = cùng 1 người đăng "Cả hai" -> không tính là 1 cặp khớp thật
+      if (chuanSdt(a.phone) === chuanSdt(c.phone)) continue;
       const taiXe = a.role === 'driver' ? a : c;
       const khach = a.role === 'driver' ? c : a;
       const kq = xetCap(a, c, rules);
