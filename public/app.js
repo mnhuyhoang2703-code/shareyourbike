@@ -312,14 +312,17 @@ const datalist = document.getElementById('goi-y-xe');
 const goiYGia = document.getElementById('goi-y-gia');
 const goiYGiaText = document.getElementById('goi-y-gia-text');
 
-const laTaiXe = () => document.querySelector('input[name="role"]:checked').value === 'driver';
+const vaiDangChon = () => document.querySelector('input[name="role"]:checked').value;
+// "Cả hai" cần khai CẢ xe của mình LẪN mong muốn -> 2 khối cùng hiện.
+const laTaiXe = () => vaiDangChon() === 'driver' || vaiDangChon() === 'both';
+const laNguoiDiNho = () => vaiDangChon() === 'rider' || vaiDangChon() === 'both';
 const loaiXeDangChon = () => document.querySelector('input[name="vehicle_type"]:checked').value;
 const mongMuonDangChon = () => document.querySelector('input[name="want_type"]:checked').value;
 
 /**
  * Loại xe dùng để tính giá gợi ý.
- * Tài xế: theo xe của mình. Người đi nhờ: theo mong muốn, "xe nào cũng được"
- * thì tính theo xe máy (rẻ hơn) để không ra con số cao quá thực tế.
+ * Có xe (kể cả "Cả hai"): theo xe của mình. Chỉ đi nhờ: theo mong muốn,
+ * "xe nào cũng được" thì tính theo xe máy (rẻ hơn) để không ra con số cao quá thực tế.
  */
 function loaiXeTinhGia() {
   if (laTaiXe()) return loaiXeDangChon();
@@ -351,19 +354,25 @@ document.getElementById('btn-dung-gia').addEventListener('click', () => {
   capNhatGia();
 });
 
-/** Form đổi mặt theo vai trò: có xe thì khai xe, đi nhờ thì khai mong muốn. */
+/** Form đổi mặt theo vai trò: có xe thì khai xe, đi nhờ thì khai mong muốn,
+ * chọn "Cả hai" thì hiện đủ cả 2 khối. */
 function capNhatTheoVaiTro() {
-  const laTX = laTaiXe();
-  khoiXe.hidden = !laTX;
-  khoiMongMuon.hidden = laTX;
+  khoiXe.hidden = !laTaiXe();
+  khoiMongMuon.hidden = !laNguoiDiNho();
 
   // "Giờ tới nơi" mang nghĩa KHÁC theo vai:
   //  - Tài xế: giờ THƯỜNG NGÀY tới nơi → mốc dựng timeline để ghép đón khách giữa
   //    đường (nên khuyến khích nhập).
   //  - Khách: HẠN CHÓT tới nơi chấp nhận được → lọc tài xế kịp giờ.
+  //  - Cả hai: dùng đúng 1 giờ thật của bạn cho cả 2 vai — vừa là mốc timeline khi
+  //    bạn chở người khác, vừa là hạn chót khi có người chở bạn.
   const nhan = document.getElementById('dropoff-label');
   const goiY = document.getElementById('dropoff-hint');
-  if (laTX) {
+  const vai = vaiDangChon();
+  if (vai === 'both') {
+    nhan.textContent = 'Giờ tới nơi';
+    goiY.textContent = 'Nên nhập — giờ bạn THƯỜNG NGÀY tới nơi. Dùng để ghép khách đi cùng đường khi bạn chở, và cũng là mốc hạn chót khi có người chở bạn.';
+  } else if (vai === 'driver') {
     nhan.textContent = 'Giờ tới nơi';
     goiY.textContent = 'Nên nhập — giờ bạn THƯỜNG NGÀY tới nơi, để hệ thống ghép được khách đi cùng đường ở giữa tuyến (nhiều kết quả hơn).';
   } else {
@@ -490,7 +499,7 @@ document.getElementById('form-chuyen').addEventListener('submit', async (e) => {
   if (loi.length) return hienLoi(loi);
 
   const body = {
-    role: document.querySelector('input[name="role"]:checked').value,
+    role: vaiDangChon(),
     name: document.getElementById('name').value,
     phone: document.getElementById('phone').value,
     email: document.getElementById('email').value || null,
@@ -505,10 +514,10 @@ document.getElementById('form-chuyen').addEventListener('submit', async (e) => {
     dropoff: document.getElementById('dropoff').value || null,
     days: days.join(','),
     price: Number(priceInput.value) || 0,
-    // Chỉ gửi trường đúng với vai trò
+    // Chỉ gửi trường đúng với vai trò ("Cả hai" gửi cả 2 nhóm trường)
     vehicle_type: laTaiXe() ? loaiXeDangChon() : null,
     vehicle_model: laTaiXe() ? (modelInput.value.trim() || null) : null,
-    want_type: laTaiXe() ? 'any' : mongMuonDangChon(),
+    want_type: laNguoiDiNho() ? mongMuonDangChon() : 'any',
   };
 
   btn.disabled = true;
@@ -600,8 +609,11 @@ async function traCuu() {
       return;
     }
     maHienTai = ma;
-    veChuyenCuaToi(data.me);
-    veKetQua(data.matches, data.ganKhop || []);
+    // Đăng "Cả hai" -> server trả { vaiTro: [{me,matches,ganKhop}, ...] } (2 phần tử).
+    // Đăng 1 vai -> giữ hình dạng cũ { me, matches, ganKhop } -> gói lại thành mảng 1 phần tử.
+    const dsKetQua = data.vaiTro || [data];
+    veChuyenCuaToi(dsKetQua.map((d) => d.me));
+    veKetQua(dsKetQua);
   } catch (err) {
     boxKq.innerHTML = '';
     xemLoi.textContent = 'Không kết nối được máy chủ: ' + err.message;
@@ -609,22 +621,31 @@ async function traCuu() {
   }
 }
 
-function veChuyenCuaToi(me) {
-  const tenChao = esc((me.name || '').trim().split(/\s+/).slice(-1)[0] || 'bạn');
-  boxToi.innerHTML =
-    `<div class="chao-mung">
-      <div class="chao-title">Xin chào ${tenChao} 👋</div>
-      <p class="chao-sub">Đây là hành trình bạn đã đăng cùng những người có thể đi chung đường với bạn. Chúc bạn sớm tìm được bạn đồng hành nhé! 🛵</p>
-    </div>
+/** `dsMe`: mảng 1 phần tử (đăng thường) hoặc 2 phần tử — driver + rider (đăng "Cả hai"). */
+function veChuyenCuaToi(dsMe) {
+  const nhieuVai = dsMe.length > 1;
+  const tenChao = esc((dsMe[0].name || '').trim().split(/\s+/).slice(-1)[0] || 'bạn');
+
+  const theChuyen = (me) => `
     <div class="my-trip">
-      <div class="t">Chuyến của bạn — ${me.role === 'driver'
+      <div class="t">${nhieuVai ? (me.role === 'driver' ? 'Vai chia sẻ chỗ trống — ' : 'Vai tìm người cùng đường — ') : 'Chuyến của bạn — '}${me.role === 'driver'
         ? 'Có xe' + (me.tenLoaiXe ? ` (${esc(me.tenLoaiXe)}${me.vehicle_model ? ' · ' + esc(me.vehicle_model) : ''})` : '')
         : 'Cần đi nhờ'}</div>
       ${esc(me.start_label)}<br>→ ${esc(me.end_label)}<br>
       Đón ${esc(me.pickup)} · ${esc(me.tenNgay)} · ${dinhDangTien(me.price)}
     </div>`;
 
-  // Vẽ lại tuyến của mình lên bản đồ để đối chiếu trực quan
+  boxToi.innerHTML =
+    `<div class="chao-mung">
+      <div class="chao-title">Xin chào ${tenChao} 👋</div>
+      <p class="chao-sub">${nhieuVai
+        ? 'Bạn đã đăng "Cả hai" — hệ thống ghép riêng cho từng vai, ai khớp trước ở vai nào thì đi cùng người đó.'
+        : 'Đây là hành trình bạn đã đăng cùng những người có thể đi chung đường với bạn.'} Chúc bạn sớm tìm được bạn đồng hành nhé! 🛵</p>
+    </div>` + dsMe.map(theChuyen).join('');
+
+  // Vẽ lại tuyến của mình lên bản đồ để đối chiếu trực quan (cả 2 vai dùng chung
+  // 1 tuyến đi/đến thật nên chỉ cần vẽ theo hàng đầu tiên).
+  const me = dsMe[0];
   if (typeof me.start_lat === 'number' && typeof me.end_lat === 'number') {
     setPoint('start', { label: me.start_label, lat: me.start_lat, lon: me.start_lon });
     setPoint('end', { label: me.end_label, lat: me.end_lat, lon: me.end_lon });
@@ -691,31 +712,39 @@ function noiBatMatch(id) {
   }
 }
 
-function veKetQua(matches, ganKhop) {
-  // Vẽ cả hai nhóm lên bản đồ để nhìn được bức tranh đầy đủ
-  veChamMatch([...matches, ...ganKhop]);
+/** `dsKetQua`: mảng 1 hoặc 2 phần tử {me, matches, ganKhop} — 2 khi đăng "Cả hai". */
+function veKetQua(dsKetQua) {
+  const nhieuVai = dsKetQua.length > 1;
+
+  // Vẽ TẤT CẢ các nhóm (cả 2 vai nếu có) lên bản đồ để nhìn được bức tranh đầy đủ
+  veChamMatch(dsKetQua.flatMap((d) => [...d.matches, ...d.ganKhop]));
 
   let html = '';
+  for (const { me, matches, ganKhop } of dsKetQua) {
+    if (nhieuVai) {
+      html += `<div class="vai-title">Kết quả cho vai ${me.role === 'driver' ? 'chia sẻ chỗ trống' : 'tìm người cùng đường'}</div>`;
+    }
 
-  if (matches.length === 0) {
-    html += `<div class="empty">Chưa có ai khớp hoàn toàn.<br>
-       Chuyến của bạn vẫn đang được lưu — quay lại bằng mã này sau nhé.</div>`;
-  } else {
-    const soHaiChieu = matches.filter((m) => m.haiChieu).length;
-    html +=
-      `<div class="count">${matches.length} người phù hợp` +
-      (soHaiChieu ? ` · <b>${soHaiChieu} đã match hai chiều</b>` : '') + `</div>` +
-      matches.map(theCard).join('');
-  }
+    if (matches.length === 0) {
+      html += `<div class="empty">Chưa có ai khớp hoàn toàn.<br>
+         Chuyến của bạn vẫn đang được lưu — quay lại bằng mã này sau nhé.</div>`;
+    } else {
+      const soHaiChieu = matches.filter((m) => m.haiChieu).length;
+      html +=
+        `<div class="count">${matches.length} người phù hợp` +
+        (soHaiChieu ? ` · <b>${soHaiChieu} đã match hai chiều</b>` : '') + `</div>` +
+        matches.map(theCard).join('');
+    }
 
-  // Mục "Gần khớp" — người trượt đúng 1 tiêu chí. Không bấm quan tâm được,
-  // mục đích là cho người dùng thấy cơ hội đang nằm ở đâu để tự điều chỉnh.
-  if (ganKhop.length > 0) {
-    html +=
-      `<div class="gan-khop-title">Gần khớp — chỉ lệch một chút</div>
-       <p class="micro" style="margin:0 0 10px">Chưa ghép được, nhưng nếu bạn chỉnh lại
-       một chút thì có thể đi chung với những người này.</p>` +
-      ganKhop.map(theCardGanKhop).join('');
+    // Mục "Gần khớp" — người trượt đúng 1 tiêu chí. Không bấm quan tâm được,
+    // mục đích là cho người dùng thấy cơ hội đang nằm ở đâu để tự điều chỉnh.
+    if (ganKhop.length > 0) {
+      html +=
+        `<div class="gan-khop-title">Gần khớp — chỉ lệch một chút</div>
+         <p class="micro" style="margin:0 0 10px">Chưa ghép được, nhưng nếu bạn chỉnh lại
+         một chút thì có thể đi chung với những người này.</p>` +
+        ganKhop.map(theCardGanKhop).join('');
+    }
   }
 
   boxKq.innerHTML = html;

@@ -86,6 +86,9 @@ async function _khoiTao() {
   await themCotNeuThieu('trips', 'want_type', "TEXT DEFAULT 'any'");
   await themCotNeuThieu('trips', 'route', 'TEXT');
   await themCotNeuThieu('trips', 'route_km', 'REAL');
+  // share_code: nối 2 hàng (driver + rider) của CÙNG một người khi họ chọn "Cả hai".
+  // NULL với chuyến đăng 1 vai như cũ. Không đặt UNIQUE (2 hàng dùng chung 1 giá trị).
+  await themCotNeuThieu('trips', 'share_code', 'TEXT');
 }
 
 // Chạy khởi tạo MỘT lần cho mỗi tiến trình; mọi hàm DB đều await cổng này trước.
@@ -108,23 +111,23 @@ function sinhMa(doDai = 6) {
   return s;
 }
 
+// Kiểm tra trùng trên CẢ code lẫn share_code — vì "cả hai vai" dùng share_code
+// bằng đúng giá trị code của hàng driver, không được đụng hàng của người khác.
 async function sinhMaDuyNhat() {
   for (let i = 0; i < 20; i++) {
     const ma = sinhMa();
-    if (!(await layMot('SELECT 1 AS x FROM trips WHERE code = ?', [ma]))) return ma;
+    if (!(await layMot('SELECT 1 AS x FROM trips WHERE code = ? OR share_code = ?', [ma, ma]))) return ma;
   }
   throw new Error('Khong sinh duoc ma duy nhat');
 }
 
-async function taoChuyen(t) {
-  await sanSang();
-  const code = await sinhMaDuyNhat();
+async function taoChuyenCore(t, code, shareCode) {
   await chay(`
-    INSERT INTO trips (code, role, name, phone, email, start_label, start_lat, start_lon,
+    INSERT INTO trips (code, share_code, role, name, phone, email, start_label, start_lat, start_lon,
                        end_label, end_lat, end_lon, pickup, dropoff, days, price, note,
                        vehicle_type, vehicle_model, want_type, created_at)
-    VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)`, [
-    code, t.role, t.name, t.phone, t.email || null,
+    VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)`, [
+    code, shareCode ?? null, t.role, t.name, t.phone, t.email || null,
     t.start_label, t.start_lat, t.start_lon,
     t.end_label, t.end_lat, t.end_lon,
     t.pickup, t.dropoff || null, t.days, t.price || 0, t.note || null,
@@ -132,6 +135,29 @@ async function taoChuyen(t) {
     new Date().toISOString(),
   ]);
   return layTheoMa(code);
+}
+
+async function taoChuyen(t) {
+  await sanSang();
+  const code = await sinhMaDuyNhat();
+  return taoChuyenCore(t, code, null);
+}
+
+/**
+ * Đăng "Cả hai" (chia sẻ chỗ trống + tìm người cùng đường): tạo 2 hàng riêng —
+ * driver + rider — cùng CHUNG một mã hiển thị cho người dùng. Kỹ thuật: hàng
+ * driver dùng chính mã đó làm `code` (để tra cứu 1-hàng cũ như layTheoMa vẫn
+ * chạy đúng), hàng rider có `code` nội bộ riêng (không hiện ra) nhưng cùng
+ * `share_code` = mã chung → layNhomTheoMa() gom được cả 2.
+ * Không đổi/ràng buộc lại UNIQUE trên `code` — an toàn với DB Turso đang chạy thật.
+ */
+async function taoCapChuyen(driverData, riderData) {
+  await sanSang();
+  const maChung = await sinhMaDuyNhat();
+  const driverRow = await taoChuyenCore({ ...driverData, role: 'driver' }, maChung, maChung);
+  const maRiengRider = await sinhMaDuyNhat();
+  const riderRow = await taoChuyenCore({ ...riderData, role: 'rider' }, maRiengRider, maChung);
+  return { code: maChung, driverRow, riderRow };
 }
 
 /**
@@ -153,6 +179,17 @@ function doiDangChuyen(row) {
 async function layTheoMa(code) {
   await sanSang();
   return doiDangChuyen(await layMot('SELECT * FROM trips WHERE code = ?', [code]));
+}
+/**
+ * Tra theo mã nhưng trả về CẢ NHÓM (dùng cho đăng nhập xem kết quả + bày tỏ quan tâm).
+ * Đăng 1 vai như cũ -> mảng 1 phần tử. Đăng "Cả hai" -> mảng 2 phần tử (driver+rider),
+ * vì mã người dùng giữ trùng với `code` của hàng driver và `share_code` của cả 2 hàng.
+ */
+async function layNhomTheoMa(ma) {
+  await sanSang();
+  const maChuan = String(ma || '').trim().toUpperCase();
+  return (await layNhieu('SELECT * FROM trips WHERE code = ? OR share_code = ?', [maChuan, maChuan]))
+    .map(doiDangChuyen);
 }
 async function layTheoId(id) {
   await sanSang();
@@ -194,7 +231,7 @@ async function laMatchHaiChieu(a, b) {
 }
 
 module.exports = {
-  client, sanSang, taoChuyen, layTheoMa, layTheoId, layTatCa,
+  client, sanSang, taoChuyen, taoCapChuyen, layTheoMa, layNhomTheoMa, layTheoId, layTatCa,
   layChuyenThieuTuyen, luuTuyen,
   bayToQuanTam, daQuanTam, laMatchHaiChieu, sinhMa,
 };

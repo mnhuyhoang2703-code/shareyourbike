@@ -548,6 +548,17 @@ body {
 
 .count { font-size: 14px; color: var(--text); margin-bottom: 10px; font-weight: 700; }
 
+/* Tiêu đề tách 2 khối kết quả khi đăng "Cả hai" (1 khối / vai) */
+.vai-title {
+  margin: 20px 0 10px;
+  padding-top: 16px;
+  border-top: 1.5px solid var(--border);
+  font-size: 13px;
+  font-weight: 700;
+  color: var(--accent-hover);
+}
+.vai-title:first-child { margin-top: 0; padding-top: 0; border-top: none; }
+
 .card {
   padding: 14px 16px;
   background: #fff;

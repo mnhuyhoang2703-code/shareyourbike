@@ -289,6 +289,57 @@ const mau = (o = {}) => ({
   ok('Rider giu dung want_type', xemRider.me.want_type === 'car');
   ok('Driver luon co want_type = any', xemXeHoi.me.want_type === 'any');
 
+  console.log('\n--- Dang "Ca hai" vai (driver + rider dung chung 1 ma) ---');
+  const caHai = (await post('/api/trips', mau({
+    role: 'both', name: 'Ca Hai Vai', phone: '0909990001',
+    vehicle_type: 'bike', vehicle_model: 'Wave', want_type: 'car',
+  }))).data;
+  ok('Dang "ca hai" van tra ve 1 ma duy nhat', typeof caHai.code === 'string' && caHai.code.length > 0);
+
+  const xemCaHai = (await get('/api/trips/' + caHai.code)).data;
+  ok('Xem ket qua tra ve mang vaiTro 2 phan tu', Array.isArray(xemCaHai.vaiTro) && xemCaHai.vaiTro.length === 2);
+  const vaiDriver = xemCaHai.vaiTro && xemCaHai.vaiTro.find((v) => v.me.role === 'driver');
+  const vaiRider = xemCaHai.vaiTro && xemCaHai.vaiTro.find((v) => v.me.role === 'rider');
+  ok('Co du ca hang driver lan rider', Boolean(vaiDriver) && Boolean(vaiRider));
+  ok('Hang driver giu dung ten xe da khai', vaiDriver && vaiDriver.me.vehicle_model === 'Wave');
+  ok('Hang rider giu dung mong muon da khai', vaiRider && vaiRider.me.want_type === 'car');
+  ok('Ca 2 hang dung chung 1 tuyen di/den', vaiDriver && vaiRider
+    && vaiDriver.me.start_label === vaiRider.me.start_label
+    && vaiDriver.me.end_label === vaiRider.me.end_label);
+  ok('Sai sdt van bi tu choi nhu binh thuong',
+    (await fetch(BASE + '/api/trips/' + caHai.code + '?phone=0900000000')
+      .then((r) => r.status)) === 403);
+
+  // Nguoi rider khac khop voi hang DRIVER cua "ca hai"
+  const riderKhopVoiCaHai = (await post('/api/trips', mau({
+    role: 'rider', vehicle_type: null, name: 'Rider Khop Ca Hai', phone: '0909990002',
+  }))).data;
+  const dsMatchCuaRider = (await get('/api/trips/' + riderKhopVoiCaHai.code)).data;
+  ok('Rider thuong thay hang DRIVER cua "ca hai" trong ket qua',
+    dsMatchCuaRider.matches.some((m) => m.name === 'Ca Hai Vai' && m.role === 'driver'));
+  const qtRiderToiCaHai = await post('/api/interest', {
+    code: riderKhopVoiCaHai.code, targetId: vaiDriver.me.id,
+  });
+  ok('Rider thuong bay to quan tam toi hang driver cua "ca hai" -> OK', qtRiderToiCaHai.status === 200);
+
+  // Nguoi driver khac khop voi hang RIDER cua "ca hai"
+  const driverKhopVoiCaHai = (await post('/api/trips', mau({
+    role: 'driver', vehicle_type: 'bike', name: 'Driver Khop Ca Hai', phone: '0909990003',
+  }))).data;
+  const dsMatchCuaDriver = (await get('/api/trips/' + driverKhopVoiCaHai.code)).data;
+  ok('Driver thuong thay hang RIDER cua "ca hai" trong ket qua',
+    dsMatchCuaDriver.matches.some((m) => m.name === 'Ca Hai Vai' && m.role === 'rider'));
+
+  // "Ca hai" tu minh bay to quan tam voi driverKhopVoiCaHai (role='driver') -> server
+  // PHAI tu dong chon hang RIDER cua "ca hai" (vai nguoc lai) de xet khop, chu khong
+  // duoc lam nham sang hang driver cua chinh no (2 driver khong bao gio khop nhau).
+  // Neu chon nham hang, timMatch se khong thay target -> tra ve 400.
+  const qtCaHaiChonDungVai = await post('/api/interest', {
+    code: caHai.code, targetId: dsMatchCuaDriver.me.id,
+  });
+  ok('"Ca hai" tu dong chon dung hang RIDER khi quan tam nguoc lai 1 driver (khong bi 400 do nham vai)',
+    qtCaHaiChonDungVai.status === 200);
+
   console.log(`\n=== Ket qua: ${pass} dat, ${fail} hong ===`);
   try { fs.unlinkSync(DB_TAM); } catch {}
   process.exit(fail > 0 ? 1 : 0);

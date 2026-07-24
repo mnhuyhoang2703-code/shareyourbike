@@ -188,7 +188,7 @@ function docBody(req, gioiHan = 64 * 1024) {
  */
 function kiemTraChuyen(b) {
   const loi = [];
-  if (b.role !== 'driver' && b.role !== 'rider') loi.push('Chưa chọn vai trò');
+  if (!['driver', 'rider', 'both'].includes(b.role)) loi.push('Chưa chọn vai trò');
   if (!String(b.name || '').trim()) loi.push('Thiếu tên');
   // Số VN: 10 số bắt đầu bằng 0, cho phép khoảng trắng/dấu chấm khi nhập
   if (!/^0\d{9}$/.test(String(b.phone || '').replace(/[\s.\-]/g, ''))) {
@@ -219,14 +219,15 @@ function kiemTraChuyen(b) {
   const gia = Number(b.price);
   if (!Number.isFinite(gia) || gia < 0 || gia > 10_000_000) loi.push('Giá không hợp lệ');
 
-  // Người có xe bắt buộc khai loại phương tiện; tên xe cụ thể thì tùy chọn
-  if (b.role === 'driver') {
+  // Người có xe (kể cả chọn "Cả hai") bắt buộc khai loại phương tiện
+  if (b.role === 'driver' || b.role === 'both') {
     if (b.vehicle_type !== 'bike' && b.vehicle_type !== 'car') {
       loi.push('Chưa chọn loại xe (xe máy / xe hơi)');
     }
   }
   // Người đi nhờ khai mong muốn là tùy chọn, nhưng nếu khai thì phải hợp lệ
-  if (b.role === 'rider' && b.want_type && !['any', 'bike', 'car'].includes(b.want_type)) {
+  if ((b.role === 'rider' || b.role === 'both') && b.want_type
+      && !['any', 'bike', 'car'].includes(b.want_type)) {
     loi.push('Mong muốn loại xe không hợp lệ');
   }
   return loi;
@@ -256,12 +257,19 @@ function congKhai(t) {
   };
 }
 
+/** Chỉ người CÓ XE mới cần tuyến đường (dùng để xét khách xuống dọc đường). Cố ý
+ * await: đăng xong là xem match được ngay, không rơi vào cảnh "một lát sau mới thấy". */
+async function luuTuyenChoTaiXe(t) {
+  const tuyen = await layTuyen(t.start_lat, t.start_lon, t.end_lat, t.end_lon);
+  if (tuyen) await store.luuTuyen(t.id, tuyen.route, tuyen.km);
+}
+
 async function handleTaoChuyen(req, res) {
   const b = await docBody(req);
   const loi = kiemTraChuyen(b);
   if (loi.length) return json(res, 400, { errors: loi });
 
-  const t = await store.taoChuyen({
+  const nen = {
     ...b,
     name: String(b.name).trim(),
     phone: String(b.phone).replace(/[\s.\-]/g, ''),
@@ -269,22 +277,31 @@ async function handleTaoChuyen(req, res) {
     days: tachNgay(b.days).join(','),
     price: Number(b.price),
     note: b.note ? String(b.note).slice(0, 300) : null,
+  };
+  const xeCuaBan = b.vehicle_type
+    ? { vehicle_type: b.vehicle_type, vehicle_model: b.vehicle_model
+        ? String(b.vehicle_model).trim().slice(0, 60) : null }
+    : { vehicle_type: null, vehicle_model: null };
+
+  // Chọn "Cả hai": lưu thành 2 hàng riêng (driver + rider), dùng chung 1 mã cho
+  // người dùng. Ai khớp trước ở vai nào thì đi cùng vai đó — không loại trừ nhau.
+  if (b.role === 'both') {
+    const { code, driverRow } = await store.taoCapChuyen(
+      { ...nen, ...xeCuaBan, want_type: 'any' },
+      { ...nen, vehicle_type: null, vehicle_model: null, want_type: b.want_type || 'any' },
+    );
+    await luuTuyenChoTaiXe(driverRow);
+    return json(res, 200, { code });
+  }
+
+  const t = await store.taoChuyen({
+    ...nen,
     // Chỉ lưu trường đúng với vai trò, tránh dữ liệu rác kiểu rider mà có tên xe
-    vehicle_type: b.role === 'driver' ? b.vehicle_type : null,
-    vehicle_model: b.role === 'driver' && b.vehicle_model
-      ? String(b.vehicle_model).trim().slice(0, 60) : null,
+    ...(b.role === 'driver' ? xeCuaBan : { vehicle_type: null, vehicle_model: null }),
     want_type: b.role === 'rider' ? (b.want_type || 'any') : 'any',
   });
 
-  // Chỉ người CÓ XE mới cần tuyến đường (dùng để xét khách xuống dọc đường).
-  // Cố ý await ở đây thay vì chạy nền: đăng xong là xem match được ngay,
-  // không rơi vào cảnh "vừa đăng thì chưa thấy ai, một lát sau mới thấy".
-  if (t.role === 'driver') {
-    const tuyen = await layTuyen(t.start_lat, t.start_lon, t.end_lat, t.end_lon);
-    // Lấy được thì lưu; không lấy được vẫn cho qua — chuyến đã đăng thành công rồi.
-    if (tuyen) await store.luuTuyen(t.id, tuyen.route, tuyen.km);
-  }
-
+  if (t.role === 'driver') await luuTuyenChoTaiXe(t);
   return json(res, 200, { code: t.code });
 }
 
@@ -299,19 +316,9 @@ const lamTron = (x) => Math.round(x * 1000) / 1000;
 const chuanTen = (s) => String(s || '').trim().replace(/\s+/g, ' ').toLowerCase();
 const chuanSdt = (s) => String(s || '').replace(/\D/g, '');
 
-async function handleXemChuyen(res, code, phone) {
-  const me = await store.layTheoMa(String(code || '').trim().toUpperCase());
-  if (!me) return json(res, 404, { error: 'Không tìm thấy mã này' });
-
-  // Đăng nhập chỉ cần khớp mã + số điện thoại (đơn giản hoá theo feedback Hoàng 23/07/2026,
-  // bỏ trường tên). Không nói rõ trường nào sai để tránh dò thông tin của người khác.
-  if (chuanSdt(phone) !== chuanSdt(me.phone)) {
-    return json(res, 403, { error: 'Mã hoặc số điện thoại không khớp. Vui lòng kiểm tra lại.' });
-  }
-
-  // Đọc DB một lần rồi dùng cho cả match lẫn gần khớp
-  const danhSach = await store.layTatCa();
-
+/** Tính matches + gần khớp cho MỘT hàng (`me`). Tách ra để dùng lại cho cả đăng
+ * 1 vai lẫn đăng "Cả hai" (khi đó gọi hàm này 2 lần, 1 lần/vai). */
+async function tinhKetQuaChoMot(me, danhSach) {
   const matches = await Promise.all(timMatch(me, danhSach).map(async (m) => {
     const [haiChieu, toiQT, hoQT] = await Promise.all([
       store.laMatchHaiChieu(me.id, m.trip.id),
@@ -369,7 +376,7 @@ async function handleXemChuyen(res, code, phone) {
     },
   }));
 
-  return json(res, 200, {
+  return {
     // Chuyến của chính mình thì được xem đầy đủ, kể cả tọa độ để vẽ lên bản đồ.
     // Tọa độ của NGƯỜI KHÁC không bao giờ gửi đi — chỉ gửi khoảng cách đã tính sẵn.
     me: {
@@ -380,16 +387,45 @@ async function handleXemChuyen(res, code, phone) {
     },
     matches,
     ganKhop,
-  });
+  };
+}
+
+async function handleXemChuyen(res, code, phone) {
+  // Đăng 1 vai -> nhóm có 1 hàng. Đăng "Cả hai" -> nhóm có 2 hàng (driver+rider)
+  // cùng dùng chung 1 mã — xem [[db.js taoCapChuyen/layNhomTheoMa]].
+  const nhom = await store.layNhomTheoMa(String(code || '').trim().toUpperCase());
+  if (!nhom.length) return json(res, 404, { error: 'Không tìm thấy mã này' });
+
+  // Đăng nhập chỉ cần khớp mã + số điện thoại (đơn giản hoá theo feedback Hoàng 23/07/2026,
+  // bỏ trường tên). Cả nhóm luôn cùng 1 người nên chỉ cần kiểm 1 hàng bất kỳ.
+  // Không nói rõ trường nào sai để tránh dò thông tin của người khác.
+  if (chuanSdt(phone) !== chuanSdt(nhom[0].phone)) {
+    return json(res, 403, { error: 'Mã hoặc số điện thoại không khớp. Vui lòng kiểm tra lại.' });
+  }
+
+  // Đọc DB một lần rồi dùng chung cho mọi vai
+  const danhSach = await store.layTatCa();
+  const ketQuaTungVai = await Promise.all(nhom.map((me) => tinhKetQuaChoMot(me, danhSach)));
+
+  // Đăng 1 vai: giữ NGUYÊN hình dạng response cũ ({me, matches, ganKhop}) để không
+  // phải đụng vào phần front-end đã chạy ổn định cho luồng cũ.
+  if (ketQuaTungVai.length === 1) return json(res, 200, ketQuaTungVai[0]);
+
+  // Đăng "Cả hai": trả mảng 2 kết quả, front-end (app.js) render riêng từng vai.
+  return json(res, 200, { vaiTro: ketQuaTungVai });
 }
 
 async function handleQuanTam(req, res) {
   const b = await docBody(req);
-  const me = await store.layTheoMa(String(b.code || '').trim().toUpperCase());
-  if (!me) return json(res, 404, { error: 'Mã không đúng' });
+  const nhom = await store.layNhomTheoMa(String(b.code || '').trim().toUpperCase());
+  if (!nhom.length) return json(res, 404, { error: 'Mã không đúng' });
 
   const target = await store.layTheoId(Number(b.targetId));
   if (!target) return json(res, 404, { error: 'Không tìm thấy chuyến kia' });
+
+  // Nhóm có thể có 2 hàng (đăng "Cả hai") — chọn đúng hàng có vai NGƯỢC với đối
+  // phương, vì luật ghép chỉ khớp khác vai nên không thể nhầm.
+  const me = nhom.find((r) => r.role !== target.role) || nhom[0];
   if (target.id === me.id) return json(res, 400, { error: 'Không thể tự quan tâm chính mình' });
 
   // Chỉ cho bày tỏ quan tâm với chuyến THỰC SỰ khớp — chặn việc dò id bừa
