@@ -45,6 +45,7 @@ function themDangNhap(p) {
 }
 
 const get = (p) => fetch(BASE + themDangNhap(p)).then(async (r) => ({ status: r.status, data: await r.json() }));
+const del = (p) => fetch(BASE + p, { method: 'DELETE' }).then(async (r) => ({ status: r.status, data: await r.json() }));
 
 // Mốc thật ở TPHCM
 const BEN_THANH = [10.7725, 106.6980];
@@ -383,6 +384,73 @@ const mau = (o = {}) => ({
   const xemLaiChuyenTest = (await get('/api/trips/' + nguoiThat1.code)).data;
   ok('Nhung chinh chuyen TEST do van xem duoc + van thay khop de debug',
     xemLaiChuyenTest.matches.some((m) => m.name === 'Nguoi That 2'));
+
+  console.log('\n--- Xoa chuyen (nut "Xoa chuyen nay" o man xem ket qua) ---');
+  const deXoa = (await post('/api/trips', mau({
+    role: 'rider', vehicle_type: null, name: 'Nguoi Se Bi Xoa', phone: '0909990020',
+  }))).data;
+  const xoaSaiSdt = await del('/api/trips/' + deXoa.code + '?phone=0900000099');
+  ok('Xoa voi sai sdt -> 403, khong xoa', xoaSaiSdt.status === 403);
+  ok('Sau khi xoa sai sdt, chuyen van con xem duoc',
+    (await get('/api/trips/' + deXoa.code)).status === 200);
+
+  const xoaDung = await del('/api/trips/' + deXoa.code + '?phone=0909990020');
+  ok('Xoa dung ma + sdt -> 200', xoaDung.status === 200);
+  ok('Sau khi xoa, xem lai -> 404 (khong con ton tai)',
+    (await get('/api/trips/' + deXoa.code)).status === 404);
+
+  // Dang "Ca hai" thi xoa phai xoa CA NHOM (2 hang) chu khong phai 1 hang
+  const caHaiDeXoa = (await post('/api/trips', mau({
+    role: 'both', name: 'Ca Hai Se Bi Xoa', phone: '0909990021', vehicle_type: 'bike',
+  }))).data;
+  const xemCaHaiTruocXoa = (await get('/api/trips/' + caHaiDeXoa.code)).data;
+  ok('Truoc khi xoa: dang "ca hai" co du 2 vai', xemCaHaiTruocXoa.vaiTro.length === 2);
+  const xoaCaHai = await del('/api/trips/' + caHaiDeXoa.code + '?phone=0909990021');
+  ok('Xoa dang "ca hai" -> 200', xoaCaHai.status === 200);
+  ok('Xoa dung ca 2 hang (daXoa=2)', xoaCaHai.data.daXoa === 2);
+  ok('Sau khi xoa, xem lai -> 404', (await get('/api/trips/' + caHaiDeXoa.code)).status === 404);
+
+  console.log('\n--- Het han luu tru 30 ngay: khong con ghep, van xem/xoa duoc ---');
+  const chuyenCu = (await post('/api/trips', mau({
+    role: 'driver', name: 'Chuyen Qua Han', phone: '0909990030',
+  }))).data;
+  // Gia lap chuyen nay da dang tu 40 ngay truoc (qua nguong 30 ngay).
+  const moc40NgayTruoc = new Date(Date.now() - 40 * 24 * 60 * 60 * 1000).toISOString();
+  await store.client.execute({
+    sql: 'UPDATE trips SET created_at = ? WHERE code = ?',
+    args: [moc40NgayTruoc, chuyenCu.code],
+  });
+
+  const khachMoiKhopTuyenCu = (await post('/api/trips', mau({
+    role: 'rider', vehicle_type: null, name: 'Khach Moi Sau Nay', phone: '0909990031',
+  }))).data;
+  const xemKhachMoi = (await get('/api/trips/' + khachMoiKhopTuyenCu.code)).data;
+  ok('Nguoi dung MOI khong thay chuyen da qua han 30 ngay trong ket qua',
+    !xemKhachMoi.matches.some((m) => m.name === 'Chuyen Qua Han'));
+
+  const xemChuyenCu = (await get('/api/trips/' + chuyenCu.code)).data;
+  ok('Chinh chuyen qua han van xem duoc (chua bi xoa vinh vien ngay)',
+    xemChuyenCu.me.name === 'Chuyen Qua Han');
+  ok('Co bao hetHan=true', xemChuyenCu.me.hetHan === true);
+  ok('Chuyen qua han khong tu tim duoc match moi nao (khong "song lai" nguoc chieu)',
+    xemChuyenCu.matches.length === 0);
+
+  const quanTamVoiChuyenCu = await post('/api/interest', {
+    code: khachMoiKhopTuyenCu.code, targetId: xemChuyenCu.me.id,
+  });
+  ok('Khong the bay to quan tam voi chuyen da qua han -> 400',
+    quanTamVoiChuyenCu.status === 400);
+
+  console.log('\n--- Don rac vinh vien khi qua 30 ngay (store.xoaChuyenHetHan) ---');
+  ok('Truoc khi don: chuyen qua han van con trong DB',
+    Boolean(await store.layTheoId(xemChuyenCu.me.id)));
+  const soLuongDaXoa = await store.xoaChuyenHetHan(30);
+  ok('xoaChuyenHetHan(30) xoa dung 1 chuyen qua han',
+    soLuongDaXoa === 1);
+  ok('Sau khi don: chuyen qua han khong con trong DB nua',
+    !(await store.layTheoId(xemChuyenCu.me.id)));
+  ok('Chuyen con han (Khach Moi Sau Nay) khong bi dong xoa nham',
+    Boolean(await store.layTheoId(xemKhachMoi.me.id)));
 
   console.log(`\n=== Ket qua: ${pass} dat, ${fail} hong ===`);
   try { fs.unlinkSync(DB_TAM); } catch {}

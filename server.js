@@ -316,6 +316,28 @@ const lamTron = (x) => Math.round(x * 1000) / 1000;
 const chuanTen = (s) => String(s || '').trim().replace(/\s+/g, ' ').toLowerCase();
 const chuanSdt = (s) => String(s || '').replace(/\D/g, '');
 
+/** Chuyến đăng quá SO_NGAY_LUU_TRU ngày (mặc định 30, xem db.js) coi là hết hạn:
+ * không còn tham gia ghép — dù chưa tới lượt dọn tự động xoá hẳn (xem
+ * xoaChuyenHetHan trong db.js). Không áp dụng cho is_test (không phải dữ liệu
+ * người dùng thật nên không có khái niệm "hết hạn lưu trữ"). */
+function daHetHan(trip) {
+  const moc = Date.now() - store.SO_NGAY_LUU_TRU * 24 * 60 * 60 * 1000;
+  return new Date(trip.created_at).getTime() < moc;
+}
+
+/**
+ * Hồ ứng viên dùng để ghép chuyến cho `me`:
+ *  - dữ liệu test (is_test=1) -> toàn bộ DB, để Hoàng debug được trên dữ liệu cũ.
+ *  - chuyến THẬT nhưng đã hết hạn lưu trữ -> hồ RỖNG, chuyến hết hạn không còn
+ *    chủ động tìm/được tìm thấy nữa (vẫn xem/xoá được, chỉ không ghép).
+ *  - còn lại (thật, còn hạn) -> layDeMatch() (loại is_test, giữ nguyên độ mới).
+ */
+async function hoUngVienChoMe(me) {
+  if (me.is_test) return store.layTatCa();
+  if (daHetHan(me)) return [];
+  return store.layDeMatch();
+}
+
 /** Tính matches + gần khớp cho MỘT hàng (`me`). Tách ra để dùng lại cho cả đăng
  * 1 vai lẫn đăng "Cả hai" (khi đó gọi hàm này 2 lần, 1 lần/vai). */
 async function tinhKetQuaChoMot(me, danhSach) {
@@ -384,6 +406,10 @@ async function tinhKetQuaChoMot(me, danhSach) {
       code: me.code, phone: me.phone, email: me.email,
       start_lat: me.start_lat, start_lon: me.start_lon,
       end_lat: me.end_lat, end_lon: me.end_lon,
+      // Quá 30 ngày -> không còn ghép nữa (matches/ganKhop rỗng ở trên do
+      // hoUngVienChoMe trả hồ rỗng). Cờ này để giao diện hiện rõ lý do + gợi ý
+      // xoá/đăng lại thay vì để người dùng tưởng "chưa có ai khớp".
+      hetHan: daHetHan(me),
     },
     matches,
     ganKhop,
@@ -403,12 +429,10 @@ async function handleXemChuyen(res, code, phone) {
     return json(res, 403, { error: 'Mã hoặc số điện thoại không khớp. Vui lòng kiểm tra lại.' });
   }
 
-  // Dữ liệu TEST/demo cũ (is_test=1) không còn tham gia ghép với người dùng thật
-  // nữa (layDeMatch loại nó ra) — nhưng vẫn nằm nguyên trong DB để debug. Riêng
-  // khi CHÍNH mã đang xem là dữ liệu test thì mới tính trên toàn bộ (layTatCa),
-  // để Hoàng debug được logic ghép trên dữ liệu cũ mà không cần xoá gì cả.
-  // Cả nhóm (đăng "Cả hai") luôn cùng is_test như nhau nên chỉ cần xét 1 hàng.
-  const danhSach = nhom[0].is_test ? await store.layTatCa() : await store.layDeMatch();
+  // Dữ liệu test hoặc đã hết hạn lưu trữ không tham gia ghép nữa (xem
+  // hoUngVienChoMe). Cả nhóm (đăng "Cả hai") luôn cùng is_test/created_at nên
+  // chỉ cần tính hồ ứng viên 1 lần rồi dùng chung cho mọi vai.
+  const danhSach = await hoUngVienChoMe(nhom[0]);
   const ketQuaTungVai = await Promise.all(nhom.map((me) => tinhKetQuaChoMot(me, danhSach)));
 
   // Đăng 1 vai: giữ NGUYÊN hình dạng response cũ ({me, matches, ganKhop}) để không
@@ -433,9 +457,9 @@ async function handleQuanTam(req, res) {
   if (target.id === me.id) return json(res, 400, { error: 'Không thể tự quan tâm chính mình' });
 
   // Chỉ cho bày tỏ quan tâm với chuyến THỰC SỰ khớp — chặn việc dò id bừa.
-  // Cùng nguyên tắc với handleXemChuyen: dữ liệu test không lẫn vào hồ ứng viên
-  // của người dùng thật, trừ khi chính mình cũng là dữ liệu test (debug).
-  const hoUngVien = me.is_test ? await store.layTatCa() : await store.layDeMatch();
+  // Cùng nguyên tắc với handleXemChuyen: dữ liệu test/hết hạn không lẫn vào hồ
+  // ứng viên của người dùng thật (trừ khi chính mình là dữ liệu test, để debug).
+  const hoUngVien = await hoUngVienChoMe(me);
   const hopLe = timMatch(me, hoUngVien).some((m) => m.trip.id === target.id);
   if (!hopLe) return json(res, 400, { error: 'Chuyến này không khớp với bạn' });
 
@@ -445,6 +469,24 @@ async function handleQuanTam(req, res) {
     haiChieu,
     lienHe: haiChieu ? { phone: target.phone, email: target.email } : null,
   });
+}
+
+/**
+ * Xoá hẳn chuyến của người dùng (bấm "Xoá chuyến này" ở màn xem kết quả).
+ * Đăng "Cả hai" -> xoá LUÔN CẢ NHÓM (driver+rider), vì từ góc nhìn người dùng
+ * đó là MỘT chuyến của họ, không phải 2 mục riêng. Xác thực giống hệt màn xem
+ * (mã + số điện thoại) — không cần đăng nhập gì thêm.
+ */
+async function handleXoaChuyen(res, code, phone) {
+  const nhom = await store.layNhomTheoMa(String(code || '').trim().toUpperCase());
+  if (!nhom.length) return json(res, 404, { error: 'Không tìm thấy mã này' });
+
+  if (chuanSdt(phone) !== chuanSdt(nhom[0].phone)) {
+    return json(res, 403, { error: 'Mã hoặc số điện thoại không khớp. Vui lòng kiểm tra lại.' });
+  }
+
+  const soHangDaXoa = await store.xoaTheoId(nhom.map((r) => r.id));
+  return json(res, 200, { daXoa: soHangDaXoa });
 }
 
 // ---- Trang quản trị (admin) ----
@@ -664,6 +706,10 @@ async function handler(req, res) {
     }
     if (url.pathname.startsWith('/api/trips/') && req.method === 'GET') {
       return await handleXemChuyen(res, url.pathname.slice('/api/trips/'.length),
+        url.searchParams.get('phone'));
+    }
+    if (url.pathname.startsWith('/api/trips/') && req.method === 'DELETE') {
+      return await handleXoaChuyen(res, url.pathname.slice('/api/trips/'.length),
         url.searchParams.get('phone'));
     }
     if (url.pathname === '/api/interest' && req.method === 'POST') {

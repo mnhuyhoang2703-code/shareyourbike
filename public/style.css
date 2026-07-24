@@ -549,6 +549,23 @@ body {
 }
 .my-trip .t { font-weight: 700; font-size: 15.5px; margin-bottom: 4px; color: var(--accent-hover); }
 
+.het-han-canh-bao {
+  padding: 11px 13px;
+  background: #fff2dc;
+  color: #96631a;
+  border-radius: var(--radius-sm);
+  font-size: 13.5px;
+  line-height: 1.55;
+  font-weight: 600;
+  margin-bottom: 12px;
+}
+.btn-xoa-chuyen {
+  border-color: #f0c9c9;
+  color: #b3423f;
+  margin-bottom: 4px;
+}
+.btn-xoa-chuyen:hover { background: #fdefee; border-color: #e8a8a6; }
+
 .count { font-size: 14px; color: var(--text); margin-bottom: 10px; font-weight: 700; }
 
 /* Tiêu đề tách 2 khối kết quả khi đăng "Cả hai" (1 khối / vai) */

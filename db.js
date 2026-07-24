@@ -104,6 +104,49 @@ async function _khoiTao() {
   if (vuaThemCotIsTest) {
     await chay('UPDATE trips SET is_test = 1');
   }
+
+  // Dọn dữ liệu quá hạn lưu trữ (30 ngày, feedback Hoàng 24/07/2026) mỗi khi tiến
+  // trình khởi động. Không phải cron chính xác từng giây, nhưng phục vụ (serverless)
+  // hay khởi động lại đều tự dọn — best-effort, đủ dùng mà không cần thêm hạ tầng.
+  await xoaChuyenHetHanTho();
+}
+
+/** Số ngày tối đa GIỮ 1 chuyến kể từ lúc đăng. Sau mốc này, chuyến không còn tham
+ * gia ghép nữa (xem hetHan() trong server.js) và bị XOÁ VĨNH VIỄN ở lần dọn tiếp
+ * theo — không áp dụng cho is_test (dữ liệu test giữ nguyên để debug bất kể cũ
+ * đến đâu, không phải dữ liệu người dùng thật nên không có lo ngại lưu trữ). */
+const SO_NGAY_LUU_TRU = 30;
+
+// Bản THÔ (không tự gọi sanSang()) — dùng nội bộ trong _khoiTao(), vì lúc đó
+// chính sanSang() đang chờ _khoiTao() chạy xong nên gọi lại sẽ bị TREO (đợi
+// chính promise đang chạy dở của mình). Hàm export bên dưới mới là bản gọi
+// được từ ngoài, có gác cổng sanSang() đầy đủ.
+async function xoaTheoIdTho(ids) {
+  if (!ids || ids.length === 0) return 0;
+  const cho = ids.map(() => '?').join(',');
+  await chay(`DELETE FROM interests WHERE from_id IN (${cho}) OR to_id IN (${cho})`, [...ids, ...ids]);
+  await chay(`DELETE FROM trips WHERE id IN (${cho})`, ids);
+  return ids.length;
+}
+async function xoaChuyenHetHanTho(soNgay = SO_NGAY_LUU_TRU) {
+  const moc = new Date(Date.now() - soNgay * 24 * 60 * 60 * 1000).toISOString();
+  const cu = await layNhieu('SELECT id FROM trips WHERE is_test = 0 AND created_at < ?', [moc]);
+  return xoaTheoIdTho(cu.map((r) => r.id));
+}
+
+/** Xoá hẳn 1 nhóm id chuyến khỏi DB, kèm dọn sạch các dòng interests liên quan
+ * (tránh rác tham chiếu tới id đã không còn). Dùng khi người dùng tự bấm "Xoá
+ * chuyến của tôi" (xem handleXoaChuyen trong server.js). */
+async function xoaTheoId(ids) {
+  await sanSang();
+  return xoaTheoIdTho(ids);
+}
+
+/** Xoá vĩnh viễn các chuyến THẬT (is_test=0) đã tạo quá SO_NGAY_LUU_TRU ngày.
+ * Gọi được từ ngoài (vd script/cron thủ công sau này) — tự chờ sanSang(). */
+async function xoaChuyenHetHan(soNgay = SO_NGAY_LUU_TRU) {
+  await sanSang();
+  return xoaChuyenHetHanTho(soNgay);
 }
 
 // Chạy khởi tạo MỘT lần cho mỗi tiến trình; mọi hàm DB đều await cổng này trước.
@@ -222,7 +265,11 @@ async function layTatCa() {
  */
 async function layDeMatch() {
   await sanSang();
-  return (await layNhieu('SELECT * FROM trips WHERE is_test = 0 ORDER BY id')).map(doiDangChuyen);
+  // Loại cả is_test LẪN chuyến đã quá hạn lưu trữ — nếu không, 1 người mới/còn
+  // hạn vẫn có thể bị ghép nhầm với ứng viên đã quá SO_NGAY_LUU_TRU ngày.
+  const moc = new Date(Date.now() - SO_NGAY_LUU_TRU * 24 * 60 * 60 * 1000).toISOString();
+  return (await layNhieu('SELECT * FROM trips WHERE is_test = 0 AND created_at >= ? ORDER BY id', [moc]))
+    .map(doiDangChuyen);
 }
 
 /** Đánh dấu (hoặc bỏ đánh dấu) 1 chuyến là dữ liệu test. Dùng cho migration 1 lần
@@ -265,6 +312,7 @@ async function laMatchHaiChieu(a, b) {
 module.exports = {
   client, sanSang, taoChuyen, taoCapChuyen, layTheoMa, layNhomTheoMa, layTheoId, layTatCa,
   layDeMatch, capNhatIsTest,
+  xoaTheoId, xoaChuyenHetHan, SO_NGAY_LUU_TRU,
   layChuyenThieuTuyen, luuTuyen,
   bayToQuanTam, daQuanTam, laMatchHaiChieu, sinhMa,
 };

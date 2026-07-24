@@ -602,6 +602,7 @@ const xemLoi = document.getElementById('xem-loi');
 const boxToi = document.getElementById('chuyen-cua-toi');
 const boxKq = document.getElementById('ket-qua');
 let maHienTai = null;
+let sdtHienTai = null; // giữ lại để gọi API xoá chuyến (cần xác thực lại mã + sđt)
 
 document.getElementById('btn-tra').addEventListener('click', traCuu);
 document.getElementById('ma-input').addEventListener('keydown', (e) => {
@@ -640,6 +641,7 @@ async function traCuu() {
       return;
     }
     maHienTai = ma;
+    sdtHienTai = sdt;
     // Đăng "Cả hai" -> server trả { vaiTro: [{me,matches,ganKhop}, ...] } (2 phần tử).
     // Đăng 1 vai -> giữ hình dạng cũ { me, matches, ganKhop } -> gói lại thành mảng 1 phần tử.
     const dsKetQua = data.vaiTro || [data];
@@ -656,6 +658,8 @@ async function traCuu() {
 function veChuyenCuaToi(dsMe) {
   const nhieuVai = dsMe.length > 1;
   const tenChao = esc((dsMe[0].name || '').trim().split(/\s+/).slice(-1)[0] || 'bạn');
+  // Cả nhóm (đăng "Cả hai") luôn cùng hạn lưu trữ nên chỉ cần xét 1 hàng.
+  const daHetHan = Boolean(dsMe[0].hetHan);
 
   const theChuyen = (me) => `
     <div class="my-trip">
@@ -672,7 +676,14 @@ function veChuyenCuaToi(dsMe) {
       <p class="chao-sub">${nhieuVai
         ? 'Bạn đã đăng "Cả hai" — hệ thống ghép riêng cho từng vai, ai khớp trước ở vai nào thì đi cùng người đó.'
         : 'Đây là hành trình bạn đã đăng cùng những người có thể đi chung đường với bạn.'} Chúc bạn sớm tìm được bạn đồng hành nhé! 🛵</p>
-    </div>` + dsMe.map(theChuyen).join('');
+    </div>` + dsMe.map(theChuyen).join('') +
+    (daHetHan
+      ? `<div class="het-han-canh-bao">Chuyến này đã đăng quá 30 ngày nên không còn được ghép nữa.
+           Xoá chuyến cũ rồi đăng lại nếu bạn vẫn còn nhu cầu nhé.</div>`
+      : '') +
+    `<button type="button" class="btn btn-ghost btn-small btn-xoa-chuyen" id="btn-xoa-chuyen">Xoá chuyến này</button>`;
+
+  document.getElementById('btn-xoa-chuyen').addEventListener('click', xoaChuyenCuaToi);
 
   // Vẽ lại tuyến của mình lên bản đồ để đối chiếu trực quan (cả 2 vai dùng chung
   // 1 tuyến đi/đến thật nên chỉ cần vẽ theo hàng đầu tiên).
@@ -680,6 +691,41 @@ function veChuyenCuaToi(dsMe) {
   if (typeof me.start_lat === 'number' && typeof me.end_lat === 'number') {
     setPoint('start', { label: me.start_label, lat: me.start_lat, lon: me.start_lon });
     setPoint('end', { label: me.end_label, lat: me.end_lat, lon: me.end_lon });
+  }
+}
+
+/** Xoá hẳn chuyến đang xem (cả 2 hàng nếu đăng "Cả hai") — cần xác nhận vì
+ * không hoàn tác được. Dùng lại đúng mã + sđt vừa tra cứu để xác thực. */
+async function xoaChuyenCuaToi() {
+  if (!maHienTai || !sdtHienTai) return;
+  if (!confirm('Xoá chuyến này? Không thể hoàn tác.')) return;
+
+  const btn = document.getElementById('btn-xoa-chuyen');
+  btn.disabled = true;
+  btn.textContent = 'Đang xoá…';
+  try {
+    const q = '?phone=' + encodeURIComponent(sdtHienTai);
+    const r = await fetch('/api/trips/' + encodeURIComponent(maHienTai) + q, { method: 'DELETE' });
+    const data = await r.json();
+    if (!r.ok) {
+      xemLoi.textContent = data.error || 'Không xoá được, thử lại sau.';
+      xemLoi.hidden = false;
+      btn.disabled = false;
+      btn.textContent = 'Xoá chuyến này';
+      return;
+    }
+    boxToi.innerHTML = '<div class="empty">Đã xoá chuyến của bạn.</div>';
+    boxKq.innerHTML = '';
+    xoaChamMatch();
+    document.getElementById('ma-input').value = '';
+    document.getElementById('sdt-xem').value = '';
+    maHienTai = null;
+    sdtHienTai = null;
+  } catch (err) {
+    xemLoi.textContent = 'Không kết nối được máy chủ: ' + err.message;
+    xemLoi.hidden = false;
+    btn.disabled = false;
+    btn.textContent = 'Xoá chuyến này';
   }
 }
 
