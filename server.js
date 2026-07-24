@@ -403,8 +403,12 @@ async function handleXemChuyen(res, code, phone) {
     return json(res, 403, { error: 'Mã hoặc số điện thoại không khớp. Vui lòng kiểm tra lại.' });
   }
 
-  // Đọc DB một lần rồi dùng chung cho mọi vai
-  const danhSach = await store.layTatCa();
+  // Dữ liệu TEST/demo cũ (is_test=1) không còn tham gia ghép với người dùng thật
+  // nữa (layDeMatch loại nó ra) — nhưng vẫn nằm nguyên trong DB để debug. Riêng
+  // khi CHÍNH mã đang xem là dữ liệu test thì mới tính trên toàn bộ (layTatCa),
+  // để Hoàng debug được logic ghép trên dữ liệu cũ mà không cần xoá gì cả.
+  // Cả nhóm (đăng "Cả hai") luôn cùng is_test như nhau nên chỉ cần xét 1 hàng.
+  const danhSach = nhom[0].is_test ? await store.layTatCa() : await store.layDeMatch();
   const ketQuaTungVai = await Promise.all(nhom.map((me) => tinhKetQuaChoMot(me, danhSach)));
 
   // Đăng 1 vai: giữ NGUYÊN hình dạng response cũ ({me, matches, ganKhop}) để không
@@ -428,8 +432,11 @@ async function handleQuanTam(req, res) {
   const me = nhom.find((r) => r.role !== target.role) || nhom[0];
   if (target.id === me.id) return json(res, 400, { error: 'Không thể tự quan tâm chính mình' });
 
-  // Chỉ cho bày tỏ quan tâm với chuyến THỰC SỰ khớp — chặn việc dò id bừa
-  const hopLe = timMatch(me, await store.layTatCa()).some((m) => m.trip.id === target.id);
+  // Chỉ cho bày tỏ quan tâm với chuyến THỰC SỰ khớp — chặn việc dò id bừa.
+  // Cùng nguyên tắc với handleXemChuyen: dữ liệu test không lẫn vào hồ ứng viên
+  // của người dùng thật, trừ khi chính mình cũng là dữ liệu test (debug).
+  const hoUngVien = me.is_test ? await store.layTatCa() : await store.layDeMatch();
+  const hopLe = timMatch(me, hoUngVien).some((m) => m.trip.id === target.id);
   if (!hopLe) return json(res, 400, { error: 'Chuyến này không khớp với bạn' });
 
   await store.bayToQuanTam(me.id, target.id);
@@ -525,6 +532,9 @@ async function handleAdminData(req, res) {
     coTuyen: Array.isArray(t.route) && t.route.length > 1,
     route_km: t.route_km ?? null,
     created_at: t.created_at,
+    // Dữ liệu cũ/test (đánh dấu is_test=1) không còn ghép với người dùng thật
+    // nữa — hiện cờ này để Hoàng phân biệt khi xem bảng/ma trận cặp bên dưới.
+    isTest: Boolean(t.is_test),
     // Toạ độ ĐẦY ĐỦ để vẽ bản đồ. Chỉ trang admin (đã nhập mật khẩu) mới nhận
     // được — luồng người dùng thường vẫn KHÔNG bao giờ thấy toạ độ người khác.
     start: [t.start_lat, t.start_lon],

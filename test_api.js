@@ -355,6 +355,35 @@ const mau = (o = {}) => ({
   ok('"Ca hai" tu dong chon dung hang RIDER khi quan tam nguoc lai 1 driver (khong bi 400 do nham vai)',
     qtCaHaiChonDungVai.status === 200);
 
+  console.log('\n--- Danh dau du lieu TEST: khong lan vao ghep chuyen that ---');
+  // store dung CHUNG ket noi voi server.js (cung SYB_DB) nen thao tac truc tiep an toan.
+  const store = require('./db.js');
+  const nguoiThat1 = (await post('/api/trips', mau({
+    role: 'driver', name: 'Nguoi That 1', phone: '0909990010',
+  }))).data;
+  const nguoiThat2 = (await post('/api/trips', mau({
+    role: 'rider', vehicle_type: null, name: 'Nguoi That 2', phone: '0909990011',
+  }))).data;
+  const xemTruocKhiDanhDau = (await get('/api/trips/' + nguoiThat2.code)).data;
+  ok('Truoc khi danh dau: 2 nguoi that khop nhau binh thuong',
+    xemTruocKhiDanhDau.matches.some((m) => m.name === 'Nguoi That 1'));
+
+  const meThat1 = (await get('/api/trips/' + nguoiThat1.code)).data.me;
+  await store.capNhatIsTest(meThat1.id, true); // gia lap: day la du lieu cu/test
+
+  const xemSauKhiDanhDau = (await get('/api/trips/' + nguoiThat2.code)).data;
+  ok('Nguoi dung THAT khong con thay chuyen da bi danh dau test trong ket qua',
+    !xemSauKhiDanhDau.matches.some((m) => m.name === 'Nguoi That 1'));
+  const quanTamVoiTest = await post('/api/interest', {
+    code: nguoiThat2.code, targetId: meThat1.id,
+  });
+  ok('Khong the bay to quan tam voi chuyen da bi danh dau test -> 400',
+    quanTamVoiTest.status === 400);
+
+  const xemLaiChuyenTest = (await get('/api/trips/' + nguoiThat1.code)).data;
+  ok('Nhung chinh chuyen TEST do van xem duoc + van thay khop de debug',
+    xemLaiChuyenTest.matches.some((m) => m.name === 'Nguoi That 2'));
+
   console.log(`\n=== Ket qua: ${pass} dat, ${fail} hong ===`);
   try { fs.unlinkSync(DB_TAM); } catch {}
   process.exit(fail > 0 ? 1 : 0);

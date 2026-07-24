@@ -43,11 +43,15 @@ const layMot = async (sql, args = []) => veMot(await chay(sql, args));
 const layNhieu = async (sql, args = []) => veObject(await chay(sql, args));
 
 // ---- Khởi tạo schema (idempotent) ----
+// Trả về true nếu VỪA thêm cột mới (lần đầu chạy trên DB này) — dùng để biết
+// khi nào cần chạy migration 1 lần đi kèm cột đó (xem is_test bên dưới).
 async function themCotNeuThieu(bang, ten, kieuVaMacDinh) {
   const cot = await layNhieu(`PRAGMA table_info(${bang})`);
   if (!cot.some((c) => c.name === ten)) {
     await chay(`ALTER TABLE ${bang} ADD COLUMN ${ten} ${kieuVaMacDinh}`);
+    return true;
   }
+  return false;
 }
 
 async function _khoiTao() {
@@ -89,6 +93,17 @@ async function _khoiTao() {
   // share_code: nối 2 hàng (driver + rider) của CÙNG một người khi họ chọn "Cả hai".
   // NULL với chuyến đăng 1 vai như cũ. Không đặt UNIQUE (2 hàng dùng chung 1 giá trị).
   await themCotNeuThieu('trips', 'share_code', 'TEXT');
+
+  // is_test: đánh dấu dữ liệu THỬ/DEMO, tách khỏi ghép chuyến thật nhưng KHÔNG xoá
+  // (vẫn xem/debug được — xem layDeMatch() và trang admin). Cột này DEFAULT 0 nên
+  // MỌI chuyến tạo mới từ đây về sau tự động là "thật" (0). Riêng LẦN ĐẦU cột này
+  // được thêm vào 1 DB đã có sẵn dữ liệu (kể cả DB production Turso đang chạy),
+  // coi TOÀN BỘ dữ liệu đang có tại thời điểm đó là dữ liệu cũ/test — đánh dấu 1
+  // lần duy nhất. Idempotent: những lần khởi động sau, cột đã tồn tại nên bỏ qua.
+  const vuaThemCotIsTest = await themCotNeuThieu('trips', 'is_test', 'INTEGER NOT NULL DEFAULT 0');
+  if (vuaThemCotIsTest) {
+    await chay('UPDATE trips SET is_test = 1');
+  }
 }
 
 // Chạy khởi tạo MỘT lần cho mỗi tiến trình; mọi hàm DB đều await cổng này trước.
@@ -200,6 +215,23 @@ async function layTatCa() {
   return (await layNhieu('SELECT * FROM trips ORDER BY id')).map(doiDangChuyen);
 }
 
+/**
+ * Chỉ chuyến THẬT (is_test=0) — dùng làm "hồ" ứng viên khi ghép chuyến cho người
+ * dùng thật. Dữ liệu cũ/test bị loại khỏi đây nhưng KHÔNG bị xoá, vẫn xem được
+ * qua layTatCa()/trang admin để debug khi cần.
+ */
+async function layDeMatch() {
+  await sanSang();
+  return (await layNhieu('SELECT * FROM trips WHERE is_test = 0 ORDER BY id')).map(doiDangChuyen);
+}
+
+/** Đánh dấu (hoặc bỏ đánh dấu) 1 chuyến là dữ liệu test. Dùng cho migration 1 lần
+ * (xem _khoiTao) và cho việc quản trị/gắn cờ thủ công khi cần. */
+async function capNhatIsTest(id, isTest) {
+  await sanSang();
+  await chay('UPDATE trips SET is_test = ? WHERE id = ?', [isTest ? 1 : 0, id]);
+}
+
 /** Các chuyến của người CÓ XE mà chưa lấy được tuyến đường. */
 async function layChuyenThieuTuyen() {
   await sanSang();
@@ -232,6 +264,7 @@ async function laMatchHaiChieu(a, b) {
 
 module.exports = {
   client, sanSang, taoChuyen, taoCapChuyen, layTheoMa, layNhomTheoMa, layTheoId, layTatCa,
+  layDeMatch, capNhatIsTest,
   layChuyenThieuTuyen, luuTuyen,
   bayToQuanTam, daQuanTam, laMatchHaiChieu, sinhMa,
 };
